@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>나의 대기 현황</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #ffffff;
+            color: #333333;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .container {
+            max-width: 400px;
+            width: 100%;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            border: 1px solid #e9ecef;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: #667eea;
+            color: white;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+        }
+
+        .header h1 {
+            font-size: 2rem;
+            margin: 0 0 10px 0;
+            color: white;
+        }
+
+        .subtitle {
+            font-size: 1rem;
+            color: rgba(255, 255, 255, 0.9);
+            margin: 0;
+        }
+
+        .waiting-card {
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            text-align: center;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            border: 1px solid #e9ecef;
+        }
+
+        .queue-number {
+            font-size: 4rem;
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 10px;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .queue-label {
+            font-size: 1.2rem;
+            color: #666;
+            margin-bottom: 30px;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 12px 24px;
+            border-radius: 25px;
+            font-weight: bold;
+            font-size: 1rem;
+            margin-bottom: 20px;
+        }
+
+        .status-waiting {
+            background: linear-gradient(45deg, #ffeaa7, #fdcb6e);
+            color: #e17055;
+        }
+
+        .status-called {
+            background: linear-gradient(45deg, #81ecec, #74b9ff);
+            color: #0984e3;
+            animation: pulse 2s infinite;
+        }
+
+        .status-completed {
+            background: linear-gradient(45deg, #00b894, #00cec9);
+            color: white;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        .info-section, .notification-section {
+            background: white;
+            border-radius: 20px;
+            padding: 25px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            border: 1px solid #e9ecef;
+        }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 0;
+            border-bottom: 1px solid #eee;
+        }
+
+        .info-row:last-child {
+            border-bottom: none;
+        }
+
+        .info-label {
+            font-weight: 600;
+            color: #666;
+            display: flex;
+            align-items: center;
+        }
+
+        .info-label i {
+            margin-right: 8px;
+            color: #667eea;
+        }
+
+        .info-value {
+            font-weight: bold;
+            color: #333;
+        }
+
+        .progress-section {
+            background: white;
+            border-radius: 20px;
+            padding: 25px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            border: 1px solid #e9ecef;
+        }
+
+        .progress-title {
+            font-size: 1.1rem;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+
+        .progress-bar {
+            background: #e0e0e0;
+            border-radius: 10px;
+            height: 20px;
+            overflow: hidden;
+            margin-bottom: 10px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            border-radius: 10px;
+            transition: width 0.5s ease;
+        }
+
+        .progress-text {
+            text-align: center;
+            font-size: 0.9rem;
+            color: #666;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 15px;
+            border: none;
+            border-radius: 15px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            text-align: center;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .btn i {
+            margin-right: 8px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.8);
+            color: #667eea;
+            border: 2px solid #667eea;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+
+
+
+        .notification-title {
+            font-size: 1.1rem;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+        }
+
+        .notification-title i {
+            margin-right: 8px;
+            color: #667eea;
+        }
+
+        .notification-message {
+            background: #f8f9fa;
+            border-left: 4px solid #667eea;
+            padding: 15px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            color: #666;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+
+        .loading i {
+            font-size: 2rem;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error-message {
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            text-align: center;
+            color: #e74c3c;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            border: 1px solid #e9ecef;
+        }
+
+        .error-message i {
+            font-size: 3rem;
+            margin-bottom: 15px;
+        }
+
+        .last-updated {
+            text-align: center;
+            color: #666;
+            font-size: 0.8rem;
+            margin-top: auto;
+            padding-top: 20px;
+        }
+
+        @media (max-width: 480px) {
+            .container {
+                padding: 10px;
+            }
+            
+            .header, .waiting-card, .info-section, .progress-section, .notification-section {
+                padding: 20px;
+            }
+            
+            .queue-number {
+                font-size: 3rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1><i class="fas fa-hospital"></i> 서대 병원</h1>
+            <p class="subtitle">나의 대기 현황</p>
+        </div>
+
+        <div id="loadingState" class="loading">
+            <i class="fas fa-spinner"></i>
+            <p>대기 현황을 불러오는 중...</p>
+        </div>
+
+        <div id="errorState" class="error-message" style="display: none;">
+            <i class="fas fa-exclamation-triangle"></i>
+            <h3>접수 정보를 찾을 수 없습니다</h3>
+            <p>올바른 접수 번호를 확인해주세요.</p>
+        </div>
+
+        <div id="waitingContent" style="display: none;">
+            <!-- 대기 번호 카드 -->
+            <div class="waiting-card">
+                <div class="queue-number" id="queueNumber">-</div>
+                <div class="queue-label">나의 대기 번호</div>
+                <div class="status-badge" id="statusBadge">대기중</div>
+            </div>
+
+            <!-- 진행 상황 -->
+            <div class="progress-section">
+                <div class="progress-title">진료 진행 상황</div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill" style="width: 30%;"></div>
+                </div>
+                <div class="progress-text" id="progressText">3명 중 1번째 대기</div>
+            </div>
+
+            <!-- 상세 정보 -->
+            <div class="info-section">
+                <div class="info-row">
+                    <div class="info-label">
+                        <i class="fas fa-user"></i>
+                        환자명
+                    </div>
+                    <div class="info-value" id="patientName">-</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">
+                        <i class="fas fa-clock"></i>
+                        접수 시간
+                    </div>
+                    <div class="info-value" id="receptionTime">-</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">
+                        <i class="fas fa-users"></i>
+                        앞 대기자
+                    </div>
+                    <div class="info-value" id="beforeCount">-명</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">
+                        <i class="fas fa-hourglass-half"></i>
+                        예상 대기시간
+                    </div>
+                    <div class="info-value" id="estimatedTime">-분</div>
+                </div>
+            </div>
+
+            <!-- 알림 설정 -->
+            <div class="notification-section">
+                <div class="notification-title">
+                    <i class="fas fa-bell"></i>
+                    알림 설정
+                </div>
+                <div class="notification-message" id="notificationStatus">
+                    호출 시 SMS로 알림을 받습니다.
+                </div>
+            </div>
+
+            <!-- 액션 버튼 -->
+            <div class="action-buttons">
+                <button class="btn btn-primary" onclick="refreshStatus()">
+                    <i class="fas fa-sync-alt"></i>
+                    새로고침
+                </button>
+                <a href="/" class="btn btn-secondary">
+                    <i class="fas fa-home"></i>
+                    홈으로
+                </a>
+            </div>
+        </div>
+
+        <div class="last-updated" id="lastUpdated">
+            마지막 업데이트: -
+        </div>
+    </div>
+
+    <!-- WebSocket 라이브러리 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.6.1/sockjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+    
+    <script>
+        // API URL을 동적으로 설정 (휴대폰 접속 시 네트워크 IP 사용)
+        function getApiBaseUrl() {
+            const hostname = window.location.hostname;
+            const port = '8081';
+            
+            if (hostname === 'localhost' || hostname === '127.0.0.1') {
+                // localhost 접속 시 실제 네트워크 IP 사용
+                return 'http://192.168.70.26:8081';
+            } else {
+                // 실제 호스트명으로 접속 시 그대로 사용
+                return `http://${hostname}:${port}`;
+            }
+        }
+        
+        const API_BASE_URL = getApiBaseUrl();
+        
+        // 접수 ID 추출
+        const urlParams = new URLSearchParams(window.location.search);
+        const receptionId = urlParams.get('id');
+        
+        let refreshInterval;
+        let stompClient = null;
+        let isConnected = false;
+
+        // WebSocket 연결
+        function connectWebSocket() {
+            const socket = new SockJS(`${API_BASE_URL}/ws`);
+            stompClient = Stomp.over(socket);
+            
+            stompClient.connect({}, function(frame) {
+                console.log('WebSocket 연결 성공:', frame);
+                isConnected = true;
+                
+                // 개인 접수 상태 변경 구독
+                stompClient.subscribe('/topic/reception/' + receptionId, function(message) {
+                    const data = JSON.parse(message.body);
+                    console.log('개인 상태 변경 수신:', data);
+                    
+                    if (data.type === 'STATUS_CHANGE') {
+                        // 상태 변경 시 데이터 새로고침
+                        loadWaitingStatusQuiet();
+                    } else if (data.type === 'DOCTOR_CALL') {
+                        // 의사 호출 시 입장 메시지 표시
+                        showWelcomeMessage();
+                        setTimeout(() => {
+                            loadWaitingStatusQuiet();
+                        }, 5000);
+                    }
+                });
+                
+                // 전체 대기열 업데이트 구독
+                stompClient.subscribe('/topic/waiting-queue', function(message) {
+                    const data = JSON.parse(message.body);
+                    console.log('대기열 업데이트 수신:', data);
+                    
+                    if (data.type === 'QUEUE_UPDATE') {
+                        // 대기열 업데이트 시 데이터 새로고침
+                        loadWaitingStatusQuiet();
+                    }
+                });
+                
+            }, function(error) {
+                console.error('WebSocket 연결 실패:', error);
+                isConnected = false;
+                // 연결 실패 시 폴링으로 폴백
+                startPolling();
+            });
+        }
+        
+        // 폴링 시작 (WebSocket 연결 실패 시 폴백)
+        function startPolling() {
+            if (refreshInterval) {
+                clearInterval(refreshInterval);
+            }
+            refreshInterval = setInterval(loadWaitingStatusQuiet, 10000);
+        }
+        
+        // 페이지 로드 시 초기화
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('페이지 초기화 시작');
+            console.log('현재 URL:', window.location.href);
+            console.log('URL 파라미터:', window.location.search);
+            
+            if (!receptionId) {
+                console.error('접수 ID가 없습니다:', receptionId);
+                showError();
+                return;
+            }
+
+            console.log('접수 ID:', receptionId);
+            console.log('API Base URL:', API_BASE_URL);
+
+            // 바로 데이터 로드 (입장 메시지는 호출 상태일 때만)
+            loadWaitingStatus();
+            
+            // WebSocket 연결 시도
+            connectWebSocket();
+            
+            // WebSocket 연결 실패 시를 위한 폴링 백업 (15초 후 시작)
+            setTimeout(() => {
+                if (!isConnected) {
+                    console.log('WebSocket 연결 실패, 폴링 모드로 전환');
+                    startPolling();
+                }
+            }, 15000);
+        });
+
+        // 대기 현황 로드
+        async function loadWaitingStatus() {
+            try {
+                if (!receptionId) {
+                    console.error('접수 ID가 없습니다');
+                    throw new Error('접수 ID가 없습니다.');
+                }
+                
+                const apiUrl = `${API_BASE_URL}/api/patient/reception/status/${receptionId}`;
+                console.log('API 호출 시작:', apiUrl);
+                
+                const response = await fetch(apiUrl);
+                console.log('API 응답 상태:', response.status);
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('API 오류 응답:', errorText);
+                    throw new Error(`HTTP ${response.status}: 접수 정보를 찾을 수 없습니다.`);
+                }
+
+                const data = await response.json();
+                console.log('API 응답 데이터:', data);
+                
+                // 호출 상태일 때만 입장 메시지 표시
+                if (data.status === 'CALLED') {
+                    console.log('환자 호출 상태 - 입장 메시지 표시');
+                    showWelcomeMessage();
+                    // 5초 후 실제 데이터 표시
+                    setTimeout(() => {
+                        updateWaitingDisplay(data);
+                        hideLoading();
+                    }, 5000);
+                } else {
+                    console.log('일반 상태 - 바로 데이터 표시');
+                    // 일반 상태일 때는 바로 데이터 표시
+                    updateWaitingDisplay(data);
+                    hideLoading();
+                }
+                
+            } catch (error) {
+                console.error('대기 현황 로드 실패:', error);
+                showError();
+            }
+        }
+
+        // 대기 현황 표시 업데이트
+        function updateWaitingDisplay(data) {
+            // 대기 번호
+            document.getElementById('queueNumber').textContent = data.waitingPosition || '-';
+            
+            // 상태 배지
+            const statusBadge = document.getElementById('statusBadge');
+            let statusText;
+            // 신분증 미확인(confirmedAt==null) && PENDING 상태면 '접수 대기중'만 표시
+            if (data.status === 'PENDING' && !data.confirmedAt) {
+                statusText = '접수 대기중';
+            } else {
+                statusText = getStatusText(data.status);
+            }
+            statusBadge.textContent = statusText;
+            statusBadge.className = `status-badge status-${data.status.toLowerCase()}`;
+            
+            // 환자 정보
+            document.getElementById('patientName').textContent = data.patientName || '-';
+            document.getElementById('receptionTime').textContent = 
+                data.createdAt ? new Date(data.createdAt).toLocaleString('ko-KR') : '-';
+            
+            // 대기 정보
+            const beforeCount = Math.max(0, (data.waitingPosition || 1) - 1);
+            document.getElementById('beforeCount').textContent = beforeCount + '명';
+            
+            // 예상 대기시간 (간호사 페이지에서 설정한 시간 사용)
+            const timePerPerson = parseInt(localStorage.getItem('waitingTimePerPerson') || '3');
+            const estimatedMinutes = beforeCount * timePerPerson;
+            document.getElementById('estimatedTime').textContent = estimatedMinutes + '분';
+            
+            // 진행률 계산
+            updateProgress(data);
+            
+            // 알림 상태
+            updateNotificationStatus(data);
+            
+            // 마지막 업데이트 시간
+            document.getElementById('lastUpdated').textContent = 
+                '마지막 업데이트: ' + new Date().toLocaleTimeString('ko-KR');
+        }
+
+        // 진행률 업데이트
+        function updateProgress(data) {
+            const totalWaiting = data.totalWaiting || 1;
+            const currentPosition = data.waitingPosition || 1;
+            const progressPercentage = Math.max(10, ((totalWaiting - currentPosition + 1) / totalWaiting) * 100);
+            
+            document.getElementById('progressFill').style.width = progressPercentage + '%';
+            document.getElementById('progressText').textContent = 
+                `${totalWaiting}명 중 ${currentPosition}번째 대기`;
+        }
+
+        // 상태 텍스트 변환
+        function getStatusText(status) {
+            switch(status) {
+                case 'PENDING': return '접수 대기';
+                case 'CONFIRMED': return '접수 확인됨';
+                case 'CALLED': return '호출됨 - 진료실로 오세요!';
+                case 'DONE': return '진료 완료';
+                default: return '대기중';
+            }
+        }
+
+        // 알림 상태 업데이트
+        function updateNotificationStatus(data) {
+            const notificationDiv = document.getElementById('notificationStatus');
+            if (data.notifyEnabled) {
+                notificationDiv.innerHTML = `
+                    <i class="fas fa-check-circle" style="color: #00b894; margin-right: 8px;"></i>
+                    호출 시 SMS로 알림을 받습니다. (${data.phoneNumber || ''})
+                `;
+            } else {
+                notificationDiv.innerHTML = `
+                    <i class="fas fa-times-circle" style="color: #e74c3c; margin-right: 8px;"></i>
+                    SMS 알림이 비활성화되어 있습니다.
+                `;
+            }
+        }
+
+        // 입장 메시지 표시
+        function showWelcomeMessage() {
+            // 로딩 화면을 입장 메시지로 변경
+            const loadingDiv = document.getElementById('loadingState');
+            const loadingSpinner = loadingDiv.querySelector('i');
+            const loadingText = loadingDiv.querySelector('p');
+            
+            // 스피너를 입장 아이콘으로 변경
+            loadingSpinner.className = 'fas fa-door-open';
+            loadingSpinner.style.fontSize = '4rem';
+            loadingSpinner.style.animation = 'none';
+            loadingSpinner.style.color = '#10b981';
+            
+            // 텍스트를 입장 메시지로 변경
+            loadingText.innerHTML = '<strong>환자님, 입장해 주세요!</strong><br><small>대기 현황을 확인하고 있습니다...</small>';
+            loadingText.style.fontSize = '1.2rem';
+            
+            // 화면 표시
+            loadingDiv.style.display = 'block';
+            document.getElementById('waitingContent').style.display = 'none';
+            document.getElementById('errorState').style.display = 'none';
+        }
+
+        // 새로고침
+        function refreshStatus() {
+            document.getElementById('loadingState').style.display = 'block';
+            document.getElementById('waitingContent').style.display = 'none';
+            loadWaitingStatusQuiet(); // 조용히 로드 (입장 메시지 없이)
+        }
+
+        // 조용한 상태 로드 (입장 메시지 없이)
+        async function loadWaitingStatusQuiet() {
+            try {
+                if (!receptionId) {
+                    throw new Error('접수 ID가 없습니다.');
+                }
+                
+                console.log('Fetching waiting status for reception ID:', receptionId);
+                const response = await fetch(`${API_BASE_URL}/api/patient/reception/status/${receptionId}`);
+                
+                if (!response.ok) {
+                    throw new Error('접수 정보를 찾을 수 없습니다.');
+                }
+
+                const data = await response.json();
+                console.log('Received data:', data);
+                
+                // 새로고침 시에는 입장 메시지 없이 바로 데이터 표시
+                updateWaitingDisplay(data);
+                hideLoading();
+                
+            } catch (error) {
+                console.error('대기 현황 로드 실패:', error);
+                showError();
+            }
+        }
+
+        // 로딩 숨기기
+        function hideLoading() {
+            // 로딩 상태를 원래대로 복원
+            const loadingDiv = document.getElementById('loadingState');
+            const loadingSpinner = loadingDiv.querySelector('i');
+            const loadingText = loadingDiv.querySelector('p');
+            
+            // 스피너를 원래대로 복원
+            loadingSpinner.className = 'fas fa-spinner';
+            loadingSpinner.style.fontSize = '';
+            loadingSpinner.style.animation = '';
+            loadingSpinner.style.color = '';
+            
+            // 텍스트를 원래대로 복원
+            loadingText.innerHTML = '대기 현황을 불러오는 중...';
+            loadingText.style.fontSize = '';
+            
+            // 화면 전환
+            document.getElementById('loadingState').style.display = 'none';
+            document.getElementById('errorState').style.display = 'none';
+            document.getElementById('waitingContent').style.display = 'block';
+        }
+
+        // 에러 표시
+        function showError() {
+            document.getElementById('loadingState').style.display = 'none';
+            document.getElementById('waitingContent').style.display = 'none';
+            document.getElementById('errorState').style.display = 'block';
+        }
+
+        // 페이지 언로드 시 정리
+        window.addEventListener('beforeunload', function() {
+            if (refreshInterval) {
+                clearInterval(refreshInterval);
+            }
+            if (stompClient && isConnected) {
+                stompClient.disconnect();
+            }
+        });
+    </script>
+</body>
+</html>

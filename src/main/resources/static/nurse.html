@@ -1,0 +1,3399 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>간호사 - 접수 관리</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.6.1/sockjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f8f9fa;
+            color: #333;
+        }
+
+        /* 암호 입력 화면 스타일 */
+        .password-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+        }
+
+        .password-modal {
+            background: white;
+            padding: 2rem;
+            border-radius: 10px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            text-align: center;
+            max-width: 400px;
+            width: 90%;
+        }
+
+        .password-modal h2 {
+            margin-bottom: 1rem;
+            color: #333;
+        }
+
+        .password-input {
+            width: 100%;
+            padding: 0.8rem;
+            margin: 1rem 0;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            font-size: 1rem;
+            text-align: center;
+        }
+
+        .password-input:focus {
+            outline: none;
+            border-color: #333;
+        }
+
+        .password-btn {
+            width: 100%;
+            padding: 0.8rem;
+            background: white;
+            color: #333;
+            border: 2px solid #333;
+            border-radius: 6px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .password-btn:hover {
+            background: #f8f9fa;
+            border-color: #000;
+            color: #000;
+        }
+
+        .password-error {
+            color: #dc3545;
+            margin-top: 0.5rem;
+            font-size: 0.9rem;
+        }
+
+        .main-content {
+            display: none;
+        }
+
+        .header {
+            background: white;
+            color: black;
+            padding: 1rem 2rem;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .header p {
+            opacity: 0.9;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+        }
+
+        .section {
+            background: white;
+            border-radius: 10px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .section h2 {
+            color: #333;
+            margin-bottom: 1rem;
+            font-size: 1.3rem;
+            border-bottom: 2px solid #333;
+            padding-bottom: 0.5rem;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .tab {
+            padding: 0.8rem 1.5rem;
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .tab.active {
+            background: white;
+            color: #333;
+            border: 2px solid #333;
+        }
+
+        .tab:hover {
+            background: #e9ecef;
+        }
+
+        .tab.active:hover {
+            background: #f8f9fa;
+            border-color: #000;
+            color: #000;
+        }
+
+        .reception-list {
+            display: grid;
+            gap: 1rem;
+        }
+
+        .reception-item {
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            padding: 1rem;
+            background: #f8f9fa;
+            transition: all 0.3s;
+        }
+
+        .reception-item:hover {
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .reception-item.pending {
+            border-left: 4px solid #ffc107;
+        }
+
+        .reception-item.confirmed {
+            border-left: 4px solid #28a745;
+        }
+
+        .reception-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+
+        .patient-name {
+            font-weight: 600;
+            font-size: 1.1rem;
+            color: #333;
+        }
+
+        .reception-time {
+            color: #666;
+            font-size: 0.9rem;
+        }
+
+        .reception-details {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 0.5rem;
+            margin: 0.5rem 0;
+        }
+
+        .detail-item {
+            font-size: 0.9rem;
+            color: #666;
+        }
+
+        .detail-item strong {
+            color: #333;
+        }
+
+        .status-badge {
+            padding: 0.3rem 0.8rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        .status-pending {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .status-confirmed {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .btn {
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: all 0.3s;
+            margin-right: 0.5rem;
+        }
+
+        .btn-primary {
+            background: white;
+            color: #333;
+            border: 2px solid #333;
+        }
+
+        .btn-primary:hover {
+            background: #f8f9fa;
+            border-color: #000;
+            color: #000;
+        }
+
+        .btn-success {
+            background: white;
+            color: #333;
+            border: 2px solid #333;
+        }
+
+        .btn-success:hover {
+            background: #f8f9fa;
+            border-color: #000;
+            color: #000;
+        }
+
+        .btn-secondary {
+            background: white;
+            color: #666;
+            border: 2px solid #666;
+        }
+
+        .btn-secondary:hover {
+            background: #f8f9fa;
+            border-color: #333;
+            color: #333;
+        }
+
+        /* 통계 버튼 스타일 */
+        .period-btn {
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .period-btn:hover {
+            background: #f8f9fa !important;
+            color: #000 !important;
+            border-color: #000 !important;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        }
+
+        .period-btn.active {
+            background: white !important;
+            color: #333 !important;
+            border: 2px solid #333 !important;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        .period-btn:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 4px rgba(102, 126, 234, 0.2);
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 3rem;
+            color: #666;
+        }
+
+        .empty-state h3 {
+            margin-bottom: 1rem;
+            color: #999;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 10px;
+            text-align: center;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .stat-number {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #333;
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-label {
+            color: #666;
+            font-size: 0.9rem;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 2rem;
+            color: #666;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #333;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1rem;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .manual-register {
+            background: #e8f4f8;
+            border: 1px solid #b8daff;
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .form-group {
+            margin-bottom: 1rem;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: #333;
+            font-weight: 500;
+        }
+
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 0.5rem;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 0.9rem;
+        }
+
+        .form-group input:focus, .form-group select:focus {
+            outline: none;
+            border-color: #333;
+        }
+
+        .date-input-group {
+            position: relative;
+        }
+
+        .quick-date-buttons {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            padding: 0.5rem;
+            z-index: 10;
+            display: none;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+
+        .btn-quick-date {
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 4px;
+            background: #f8f9fa;
+            color: #495057;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: all 0.3s;
+            flex: 1;
+            min-width: 60px;
+        }
+
+        .btn-quick-date:hover {
+            background: #333;
+            color: white;
+        }
+
+
+
+        #searchResults {
+            margin-top: 1rem;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            background: white;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        #searchResults h3 {
+            padding: 1rem;
+            margin: 0;
+            background: #f8f9fa;
+            border-bottom: 1px solid #e9ecef;
+            color: #333;
+            font-size: 1.1rem;
+        }
+
+        #searchResultsList .reception-item {
+            margin: 0;
+            border: none;
+            border-bottom: 1px solid #e9ecef;
+            border-radius: 0;
+        }
+
+        #searchResultsList .reception-item:last-child {
+            border-bottom: none;
+        }
+
+        #searchResultsList .reception-item:hover {
+            background: #f8f9fa;
+        }
+
+        .patient-suggestions {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            max-height: 200px;
+            overflow-y: auto;
+            z-index: 10;
+            display: none;
+        }
+
+        .suggestion-item {
+            padding: 0.75rem;
+            border-bottom: 1px solid #e9ecef;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .suggestion-item:last-child {
+            border-bottom: none;
+        }
+
+        .suggestion-item:hover {
+            background: #f8f9fa;
+        }
+
+        .suggestion-name {
+            font-weight: 600;
+            color: #333;
+        }
+
+        .suggestion-details {
+            font-size: 0.85rem;
+            color: #666;
+            margin-top: 0.25rem;
+        }
+
+        .existing-patient-info {
+            margin: 1rem 0;
+            padding: 1rem;
+            background: #e8f4f8;
+            border: 1px solid #b8daff;
+            border-radius: 8px;
+        }
+
+        .existing-patient-info h4 {
+            margin: 0 0 1rem 0;
+            color: #333;
+            font-size: 1.1rem;
+        }
+
+        .patient-info-card {
+            background: white;
+            padding: 1rem;
+            border-radius: 6px;
+            border: 1px solid #dee2e6;
+        }
+
+        .patient-basic-info {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 0.75rem;
+            flex-wrap: wrap;
+        }
+
+        .patient-basic-info .patient-name {
+            font-weight: 600;
+            font-size: 1.1rem;
+            color: #333;
+        }
+
+        .patient-basic-info .patient-birth,
+        .patient-basic-info .patient-phone {
+            color: #666;
+            font-size: 0.9rem;
+        }
+
+        .patient-history {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 0.75rem;
+            font-size: 0.9rem;
+            color: #666;
+        }
+
+        .patient-symptoms {
+            padding: 0.5rem;
+            background: #f8f9fa;
+            border-radius: 4px;
+            font-size: 0.9rem;
+            margin-top: 0.5rem;
+        }
+
+        .form-group {
+            position: relative;
+        }
+
+        /* 처방전 미리보기 스타일 */
+        .prescription-preview {
+            background: white;
+            border: 2px solid #333;
+            border-radius: 8px;
+            padding: 30px;
+            margin-top: 20px;
+            font-family: 'Malgun Gothic', '맑은 고딕', sans-serif;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            position: relative;
+        }
+
+        .prescription-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            border-bottom: 3px solid #333;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+        }
+
+        .clinic-info {
+            text-align: left;
+        }
+
+        .clinic-info h2 {
+            color: #333;
+            font-size: 1.8em;
+            margin-bottom: 5px;
+        }
+
+        .clinic-info p {
+            color: #666;
+            font-size: 0.9em;
+            margin: 2px 0;
+        }
+
+        .prescription-title {
+            text-align: center;
+        }
+
+        .prescription-title h1 {
+            color: #333;
+            font-size: 2.2em;
+            margin-bottom: 10px;
+            letter-spacing: 2px;
+        }
+
+        .prescription-title p {
+            color: #666;
+            font-size: 1em;
+        }
+
+        .patient-info-section {
+            margin-bottom: 30px;
+        }
+
+        .patient-info-table {
+            width: 100%;
+            border-collapse: collapse;
+            border: 2px solid #333;
+        }
+
+        .patient-info-table td {
+            padding: 12px 15px;
+            border: 1px solid #333;
+            font-size: 1em;
+        }
+
+        .patient-info-table td:first-child,
+        .patient-info-table td:nth-child(3) {
+            background: #f8f9fa;
+            width: 120px;
+            font-weight: 600;
+        }
+
+        .prescription-section {
+            margin-bottom: 25px;
+        }
+
+        .prescription-section h3 {
+            color: #333;
+            font-size: 1.3em;
+            margin-bottom: 15px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #333;
+        }
+
+        .prescription-table {
+            width: 100%;
+            border-collapse: collapse;
+            border: 2px solid #333;
+        }
+
+        .prescription-table th,
+        .prescription-table td {
+            padding: 12px 15px;
+            border: 1px solid #333;
+            text-align: left;
+        }
+
+        .prescription-table th {
+            background: #f8f9fa;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .prescription-table tbody tr:nth-child(even) {
+            background: #f9f9f9;
+        }
+
+        .notes-box,
+        .followup-box {
+            border: 2px solid #333;
+            padding: 15px;
+            background: #f8f9fa;
+            min-height: 60px;
+            border-radius: 4px;
+        }
+
+        .prescription-footer {
+            margin-top: 40px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+        }
+
+        .doctor-info {
+            text-align: left;
+        }
+
+        .doctor-info p {
+            margin: 5px 0;
+            font-size: 1em;
+        }
+
+        .prescription-note {
+            text-align: right;
+            font-size: 0.9em;
+            color: #666;
+        }
+
+        .prescription-note p {
+            margin: 3px 0;
+        }
+
+        .print-actions {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            display: flex;
+            gap: 10px;
+        }
+
+        .print-actions .btn {
+            padding: 8px 16px;
+            font-size: 0.9em;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        @media print {
+            .print-actions {
+                display: none !important;
+            }
+            
+            .prescription-preview {
+                border: none;
+                box-shadow: none;
+                padding: 0;
+                margin: 0;
+            }
+            
+            body * {
+                visibility: hidden;
+            }
+            
+            .prescription-preview, .prescription-preview * {
+                visibility: visible;
+            }
+            
+            .prescription-preview {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+            }
+        }
+
+        .radio-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.7rem;
+            margin-top: 0.8rem;
+        }
+
+        .radio-item {
+            display: flex;
+            align-items: center;
+            padding: 0.5rem 0.8rem;
+            background: white;
+            border-radius: 6px;
+            border: 2px solid #e9ecef;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            font-size: 16px;
+            gap: 8px;
+        }
+
+        .radio-item:hover {
+            border-color: #007bff;
+            background: #f8f9fa;
+        }
+
+        .radio-item input[type="radio"] {
+            margin: 0;
+            width: 18px;
+            height: 18px;
+            accent-color: #007bff;
+            cursor: pointer;
+        }
+
+        .radio-item:has(input[type="radio"]:checked) {
+            border-color: #007bff;
+            background: #e7f3ff;
+        }
+    </style>
+</head>
+<body>
+    <!-- 암호 입력 화면 -->
+    <div id="passwordOverlay" class="password-overlay">
+        <div class="password-modal">
+            <h2>🔒 간호사 페이지 접근</h2>
+            <p>암호를 입력해주세요</p>
+            <input type="password" id="passwordInput" class="password-input" placeholder="암호 입력" maxlength="20">
+            <button onclick="checkPassword()" class="password-btn">확인</button>
+            <div id="passwordError" class="password-error"></div>
+        </div>
+    </div>
+
+    <!-- 메인 컨텐츠 -->
+    <div class="main-content">
+        <div class="header">
+            <h1><i class="fas fa-hospital"></i> 서대 병원</h1>
+        </div>
+
+        <div class="container">
+        <!-- 통계 -->
+        <div class="stats">
+            <div class="stat-card">
+                <div class="stat-number" id="pendingCount">-</div>
+                <div class="stat-label">대기 중</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="confirmedCount">-</div>
+                <div class="stat-label">확인됨</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="todayTotal">-</div>
+                <div class="stat-label">오늘 총 접수</div>
+            </div>
+        </div>
+
+        <!-- 환자 접수 -->
+        <div class="section">
+            <h2>👤 환자 접수</h2>
+            <div class="manual-register">
+                <form id="manualRegisterForm">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="manualName">이름 *</label>
+                            <input type="text" id="manualName" name="name" required placeholder="환자 이름을 입력하세요">
+                            <div id="patientSuggestions" class="patient-suggestions"></div>
+                        </div>
+                        <div class="form-group">
+                            <label for="manualBirthDate">생년월일 *</label>
+                            <input type="text" id="manualBirthDate" name="birthDate" placeholder="YYYY-MM-DD (예: 1990-01-15)" required 
+                                   pattern="^\d{4}-\d{2}-\d{2}$" maxlength="10">
+                            <small style="color: #666; font-size: 0.8rem; margin-top: 0.25rem; display: block;">
+                                YYYY-MM-DD 형식으로 입력하세요 (예: 1990-01-15)
+                            </small>
+                        </div>
+                        <div class="form-group">
+                            <label for="manualPhone">전화번호</label>
+                            <input type="tel" id="manualPhone" name="phoneNumber" placeholder="010-1234-5678">
+                        </div>
+
+                    </div>
+                    
+                    <!-- 기존 환자 정보 표시 영역 -->
+                    <div id="existingPatientInfo" class="existing-patient-info" style="display: none;">
+                        <h4>📋 기존 환자 정보</h4>
+                        <div class="patient-info-card">
+                            <div class="patient-basic-info" id="existingPatientBasicInfo">
+                                <span id="existingPatientName" class="patient-name"></span>
+                                <span id="existingPatientBirth" class="patient-birth"></span>
+                                <span id="existingPatientPhone" class="patient-phone"></span>
+                                <button id="editPatientBtn" type="button" class="btn btn-secondary" style="margin-left:1rem; font-size:0.9rem; padding:0.2rem 0.8rem;">수정</button>
+                            </div>
+                            <div class="patient-basic-info" id="editPatientForm" style="display:none; gap:0.5rem; align-items:center;">
+                                <input type="text" id="editPatientName" class="patient-name" style="width:120px;" placeholder="이름">
+                                <input type="date" id="editPatientBirth" class="patient-birth" style="width:130px;">
+                                <input type="text" id="editPatientPhone" class="patient-phone" style="width:140px;" placeholder="전화번호">
+                                <button id="savePatientBtn" type="button" class="btn btn-primary" style="font-size:0.9rem; padding:0.2rem 0.8rem;">저장</button>
+                                <button id="cancelEditPatientBtn" type="button" class="btn btn-secondary" style="font-size:0.9rem; padding:0.2rem 0.8rem;">취소</button>
+                            </div>
+                            <div class="patient-history">
+                                <div class="visit-count">총 방문: <span id="existingVisitCount">0</span>회</div>
+                                <div class="last-visit">최근 방문: <span id="existingLastVisit">-</span></div>
+                            </div>
+                            <div id="existingSymptoms" class="patient-symptoms" style="display: none;">
+                                <strong>최근 증상:</strong> <span id="existingSymptomsText"></span>
+                            </div>
+                        </div>
+                    </div>
+                                          <div class="form-row">
+                        <div class="form-group" id="manualSmsNotifyGroup">
+                          <label style="font-weight:600; margin-bottom: 0.5rem;">SMS 알림</label>
+                          <div class="radio-group">
+                            <label class="radio-item">
+                              <input type="radio" id="manualNotifyYes" name="notifyEnabled" value="true">
+                              알림 받기
+                            </label>
+                            <label class="radio-item">
+                              <input type="radio" id="manualNotifyNo" name="notifyEnabled" value="false" checked>
+                              알림 받지 않기
+                            </label>
+                          </div>
+                          <span id="manualNotifyInfo" style="color: #888; font-size: 0.95em; margin-top: 0.5em;"></span>
+                        </div>
+                      </div>
+                      
+                    
+                    <div class="form-row">
+                        <div class="form-group" style="grid-column: 1 / -1;">
+                            <label for="manualSymptoms">증상 메모</label>
+                            <textarea id="manualSymptoms" name="symptoms" rows="3" placeholder="환자의 증상이나 특이사항을 입력하세요 (선택사항)" style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px; resize: vertical; font-family: inherit;"></textarea>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>&nbsp;</label>
+                            <button type="submit" class="btn btn-primary">바로 접수</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Vital Sign 입력 -->
+        <div class="section">
+            <h2><i class="fas fa-thermometer-half"></i> Vital Sign 입력</h2>
+            <div class="vital-sign-section">
+                <div class="patient-selector" style="margin-bottom: 1rem;">
+                    <label for="vitalPatientSelect">환자 선택:</label>
+                    <select id="vitalPatientSelect" style="padding: 0.5rem; margin-left: 0.5rem; border: 1px solid #ddd; border-radius: 4px; min-width: 200px;">
+                        <option value="">환자를 선택하세요</option>
+                    </select>
+                    <button class="btn btn-secondary" onclick="loadConfirmedPatients()" style="margin-left: 0.5rem;">새로고침</button>
+                </div>
+                
+                <div id="vitalSignForm" style="display: none;">
+                    <div class="vital-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1rem;">
+                        <div class="vital-item">
+                            <label for="bodyTemp">체온 (℃)</label>
+                            <input type="number" id="bodyTemp" placeholder="36.5" step="0.1" min="35" max="42" style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
+                        </div>
+                        <div class="vital-item">
+                            <label for="bloodPressure">혈압 (mmHg)</label>
+                            <input type="text" id="bloodPressure" placeholder="120/80" pattern="[0-9]+/[0-9]+" style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
+                        </div>
+                        <div class="vital-item">
+                            <label for="pulse">맥박 (bpm)</label>
+                            <input type="number" id="pulse" placeholder="72" min="40" max="200" style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
+                        </div>
+                    </div>
+                    
+                    <div class="symptom-check" style="margin-bottom: 1rem;">
+                        <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">주요 증상 체크:</label>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 0.5rem; margin-bottom: 1rem;">
+                            <label style="display: flex; align-items: center; gap: 0.3rem;">
+                                <input type="checkbox" name="symptoms" value="기침"> 기침
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 0.3rem;">
+                                <input type="checkbox" name="symptoms" value="콧물"> 콧물
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 0.3rem;">
+                                <input type="checkbox" name="symptoms" value="발열"> 발열
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 0.3rem;">
+                                <input type="checkbox" name="symptoms" value="두통"> 두통
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 0.3rem;">
+                                <input type="checkbox" name="symptoms" value="복통"> 복통
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 0.3rem;">
+                                <input type="checkbox" name="symptoms" value="설사"> 설사
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 0.3rem;">
+                                <input type="checkbox" name="symptoms" value="구토"> 구토
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 0.3rem;">
+                                <input type="checkbox" name="symptoms" value="어지러움"> 어지러움
+                            </label>
+                        </div>
+                        
+                        <div class="other-symptoms" style="margin-top: 1rem;">
+                            <label for="otherSymptoms" style="display: block; margin-bottom: 0.5rem; font-weight: 600;">기타 증상:</label>
+                            <textarea id="otherSymptoms" rows="2" placeholder="위 체크박스에 없는 증상을 직접 입력하세요..." style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px; resize: vertical; font-family: inherit;"></textarea>
+                        </div>
+                    </div>
+                    
+                    <div class="medical-history" style="margin-bottom: 1rem;">
+                        <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">과거력 체크:</label>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 0.5rem;">
+                            <label style="display: flex; align-items: center; gap: 0.3rem;">
+                                <input type="checkbox" name="history" value="당뇨"> 당뇨
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 0.3rem;">
+                                <input type="checkbox" name="history" value="고혈압"> 고혈압
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 0.3rem;">
+                                <input type="checkbox" name="history" value="심장병"> 심장병
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 0.3rem;">
+                                <input type="checkbox" name="history" value="복용약 있음"> 복용약 있음
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 0.3rem;">
+                                <input type="checkbox" name="history" value="알레르기"> 알레르기
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 0.3rem;">
+                                <input type="checkbox" name="history" value="없음"> 없음
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div class="additional-notes" style="margin-bottom: 1rem;">
+                        <label for="nurseNotes" style="display: block; margin-bottom: 0.5rem; font-weight: 600;">간호사 메모:</label>
+                        <textarea id="nurseNotes" rows="3" placeholder="추가 관찰사항이나 환자 상태를 입력하세요..." style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px; resize: vertical; font-family: inherit;"></textarea>
+                    </div>
+                    
+                    <div class="vital-actions">
+                        <button class="btn btn-primary" onclick="saveVitalSigns()">Vital Sign 저장</button>
+                        <button class="btn btn-secondary" onclick="clearVitalForm()">초기화</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+
+
+        <!-- 탭 메뉴 -->
+        <div class="section">
+            <div class="tabs">
+                <div class="tab active" data-tab="pending">대기 중 접수</div>
+                <div class="tab" data-tab="confirmed">확인된 접수</div>
+                <div class="tab" data-tab="prescriptions">처방전 출력</div>
+                <div class="tab" data-tab="statistics">통계</div>
+                <div class="tab" data-tab="sms">설정</div>
+            </div>
+
+            <!-- 대기 중 접수 -->
+            <div id="pendingTab" class="tab-content">
+                <div id="pendingLoading" class="loading">
+                    <div class="spinner"></div>
+                    <p>대기 중 접수를 불러오는 중...</p>
+                </div>
+                <div id="pendingList" class="reception-list"></div>
+            </div>
+
+            <!-- 확인된 접수 -->
+            <div id="confirmedTab" class="tab-content" style="display: none;">
+                <div id="confirmedLoading" class="loading">
+                    <div class="spinner"></div>
+                    <p>확인된 접수를 불러오는 중...</p>
+                </div>
+                <div id="confirmedList" class="reception-list"></div>
+            </div>
+
+            <!-- 처방전 출력 -->
+            <div id="prescriptionsTab" class="tab-content" style="display: none;">
+                <div class="prescription-controls" style="margin-bottom: 1rem;">
+                    <button class="btn btn-primary" onclick="loadPendingPrescriptions()">
+                        새로고침
+                    </button>
+                    <span style="margin-left: 1rem; color: #666;">
+                        출력 대기 중인 처방전: <strong id="pendingPrescriptionCount">0</strong>건
+                    </span>
+                </div>
+                
+                <div id="prescriptionLoading" class="loading">
+                    <div class="spinner"></div>
+                    <p>처방전을 불러오는 중...</p>
+                </div>
+                <div id="prescriptionList" class="reception-list"></div>
+            </div>
+
+            <!-- 통계 -->
+            <div id="statisticsTab" class="tab-content" style="display: none;">
+                <!-- 기간 선택 -->
+                <div class="statistics-controls" style="margin-bottom: 2rem; padding: 1rem; background: #f8f9fa; border-radius: 8px;">
+                    <div class="period-buttons" style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
+                        <button class="btn btn-secondary period-btn active" data-period="today" onclick="loadStatistics('today')">오늘</button>
+                        <button class="btn btn-secondary period-btn" data-period="week" onclick="loadStatistics('week')">이번 주</button>
+                        <button class="btn btn-secondary period-btn" data-period="month" onclick="loadStatistics('month')">이번 달</button>
+                        <button class="btn btn-secondary period-btn" data-period="custom" onclick="showCustomPeriod()">기간별 통계</button>
+                    </div>
+                    
+                    <div id="customPeriodDiv" style="display: none;">
+                        <div style="display: flex; gap: 1rem; align-items: center;">
+                            <label>시작일:</label>
+                            <input type="date" id="startDate" style="padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
+                            <label>종료일:</label>
+                            <input type="date" id="endDate" style="padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
+                            <button class="btn btn-primary" onclick="loadCustomStatistics()">조회</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 로딩 -->
+                <div id="statisticsLoading" class="loading">
+                    <div class="spinner"></div>
+                    <p>통계를 불러오는 중...</p>
+                </div>
+
+                <!-- 통계 컨텐츠 -->
+                <div id="statisticsContent" style="display: none;">
+                    <!-- 기본 통계 -->
+                    <div class="stats-summary" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
+                        <div class="stat-card">
+                            <div class="stat-number" id="totalVisits">0</div>
+                            <div class="stat-label">총 방문자 수</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-number" id="totalNewPatients">0</div>
+                            <div class="stat-label">신규 환자 수</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-number" id="totalPrescriptions">0</div>
+                            <div class="stat-label">처방전 수</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-number" id="averageWaitingTime">0</div>
+                            <div class="stat-label">평균 대기시간 (분)</div>
+                        </div>
+                    </div>
+
+                    <!-- 피크 시간 정보 -->
+                    <div class="peak-info" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 2rem;">
+                        <div class="stat-card">
+                            <div class="stat-number" id="busiestHour" style="font-size: 1.2rem;">-</div>
+                            <div class="stat-label">가장 바쁜 시간대</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-number" id="busiestDay" style="font-size: 1.2rem;">-</div>
+                            <div class="stat-label">가장 바쁜 요일</div>
+                        </div>
+                    </div>
+
+                    <!-- 차트 컨테이너 -->
+                    <div class="charts-container" style="display: flex; flex-wrap: wrap; gap: 1rem; align-items: flex-start;">
+                        <div class="chart-section" style="flex: 1 1 250px; min-width: 220px; max-width: 350px; margin-bottom: 0.7rem;">
+                            <h3 style="margin-bottom: 1rem; color: #333;">시간대별 방문자 수</h3>
+                            <div style="background: white; padding: 0.2rem; border-radius: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+                                <canvas id="hourlyChart" width="250" height="120"></canvas>
+                            </div>
+                        </div>
+                        <div class="chart-section" style="flex: 1 1 180px; min-width: 160px; max-width: 220px; margin-bottom: 0.7rem;">
+                            <h3 style="margin-bottom: 1rem; color: #333;">요일별 방문자 수</h3>
+                            <div style="background: white; padding: 0.2rem; border-radius: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+                                <canvas id="weeklyChart" width="180" height="110"></canvas>
+                            </div>
+                        </div>
+                        <div class="chart-section" style="flex: 1 1 180px; min-width: 160px; max-width: 220px; margin-bottom: 0.7rem;">
+                            <h3 style="margin-bottom: 1rem; color: #333;">연령대별 방문자 분포</h3>
+                            <div style="background: white; padding: 0.2rem; border-radius: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+                                <canvas id="ageChart" width="180" height="110"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SMS 관리 -->
+            <div id="smsTab" class="tab-content" style="display: none;">
+                <div class="sms-management">
+                    <!-- 대기시간 설정 섹션 -->
+                    <div class="sms-section" style="margin-bottom: 2rem;">
+                        <h3 style="margin-bottom: 1rem; color: #333;">⏰ 평균 대기시간 설정</h3>
+                        <div class="waiting-time-control" style="background: #f8f9fa; padding: 1.5rem; border-radius: 8px; border-left: 4px solid #007bff;">
+                            <div class="current-setting" style="margin-bottom: 1rem;">
+                                <h4 style="margin-bottom: 0.5rem; color: #333;">현재 설정</h4>
+                                <div id="currentWaitingTimeDisplay" style="font-size: 1.2rem; font-weight: bold; color: #007bff;">
+                                    1명당 3분
+                                </div>
+                            </div>
+                            
+                            <div class="setting-controls" style="display: flex; gap: 1rem; align-items: center; margin-bottom: 1rem;">
+                                <label for="waitingTimePerPerson" style="color: #333; font-weight: 500;">1명당 대기시간:</label>
+                                <input type="number" id="waitingTimePerPerson" min="1" max="30" value="3" 
+                                       style="width: 80px; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px; text-align: center;">
+                                <span style="color: #666;">분</span>
+                                <button id="updateWaitingTimeBtn" class="btn btn-primary" onclick="updateWaitingTime()">
+                                    설정 변경
+                                </button>
+                            </div>
+                            
+                            <div class="preview-examples" style="background: #e3f2fd; padding: 1rem; border-radius: 6px; border: 1px solid #bbdefb;">
+                                <h5 style="margin-bottom: 0.5rem; color: #1976d2;">💡 예상 대기시간 미리보기</h5>
+                                <div id="waitingTimePreview" style="line-height: 1.6; color: #1976d2; font-size: 0.9rem;">
+                                    <div>• 대기 0명: 0분</div>
+                                    <div>• 대기 1명: 3분</div>
+                                    <div>• 대기 2명: 6분</div>
+                                    <div>• 대기 3명: 9분</div>
+                                    <div>• 대기 5명: 15분</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- SMS 모드 설정 섹션 -->
+                    <div class="sms-section" style="margin-bottom: 2rem;">
+                        <h3 style="margin-bottom: 1rem; color: #333;"><i class="fas fa-cog"></i> SMS 발송 모드 설정</h3>
+                        <div class="sms-mode-control" style="background: #f8f9fa; padding: 1.5rem; border-radius: 8px; border-left: 4px solid #ff9800;">
+                            <div class="mode-status" style="margin-bottom: 1rem;">
+                                <h4 style="margin-bottom: 0.5rem; color: #333;">현재 모드</h4>
+                                <div id="currentModeDisplay" style="font-size: 1.2rem; font-weight: bold; color: #ff9800;">
+                                    로딩 중...
+                                </div>
+                            </div>
+                            
+                            <div class="mode-controls" style="display: flex; gap: 1rem; align-items: center; margin-bottom: 1rem;">
+                                <button id="simulationModeBtn" class="btn btn-warning" onclick="setSmsMode(true)">
+                                    <i class="fas fa-wrench"></i> 시뮬레이션 모드
+                                </button>
+                                <button id="realModeBtn" class="btn btn-success" onclick="setSmsMode(false)">
+                                    <i class="fas fa-mobile-alt"></i> 실제 발송 모드
+                                </button>
+                            </div>
+                            
+                            <div class="mode-info" style="background: #fff3cd; padding: 1rem; border-radius: 6px; border: 1px solid #ffeaa7;">
+                                <h5 style="margin-bottom: 0.5rem; color: #856404;">💡 모드 설명</h5>
+                                <ul style="margin-left: 1.5rem; line-height: 1.6; color: #856404;">
+                                    <li><strong>시뮬레이션 모드:</strong> 실제 SMS를 발송하지 않고 로그만 출력합니다. (비용 절약)</li>
+                                    <li><strong>실제 발송 모드:</strong> 실제 SMS를 발송합니다. (비용 발생)</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- SMS 테스트 섹션 -->
+                    <div class="sms-section" style="margin-bottom: 2rem;">
+                        <h3 style="margin-bottom: 1rem; color: #333;"><i class="fas fa-sms"></i> SMS 테스트 발송</h3>
+                        <div class="sms-test-form" style="background: #f8f9fa; padding: 1.5rem; border-radius: 8px;">
+                            <div class="form-row" style="display: grid; grid-template-columns: 1fr 2fr 1fr; gap: 1rem; align-items: end;">
+                                <div class="form-group">
+                                    <label for="testPhoneNumber">전화번호</label>
+                                    <input type="text" id="testPhoneNumber" placeholder="010-1234-5678" 
+                                           style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
+                                </div>
+                                <div class="form-group">
+                                    <label for="testMessage">메시지</label>
+                                    <input type="text" id="testMessage" placeholder="테스트 메시지를 입력하세요" 
+                                           style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
+                                </div>
+                                <div class="form-group">
+                                    <button class="btn btn-primary" onclick="sendTestSms()">SMS 발송</button>
+                                </div>
+                            </div>
+                            <div id="testSmsResult" style="margin-top: 1rem; padding: 0.5rem; border-radius: 4px; display: none;"></div>
+                        </div>
+                    </div>
+
+                    <!-- SMS 알림 설정 정보 -->
+                    <div class="sms-section">
+                        <h3 style="margin-bottom: 1rem; color: #333;">🔔 자동 SMS 알림 규칙</h3>
+                        <div class="sms-info" style="background: #e7f3ff; padding: 1.5rem; border-radius: 8px; border-left: 4px solid #2196f3;">
+                            <ul style="margin-left: 1.5rem; line-height: 1.6; color: #1976d2;">
+                                <li>대기 환자가 <strong>3명 이상</strong>일 때 SMS 알림이 발송됩니다.</li>
+                                <li><strong>3번째 환자부터</strong> "2팀 전 알림"을 받습니다.</li>
+                                <li>환자 접수 확인 시 또는 의사 호출 시 자동으로 체크됩니다.</li>
+                                <li>전화번호가 없거나 알림을 거부한 환자는 제외됩니다.</li>
+                                <li>현재 설정된 모드에 따라 실제 발송 또는 시뮬레이션이 실행됩니다.</li>
+                            </ul>
+                        </div>
+                    </div>
+                    
+                    <!-- SMS 알림 발송 시점 설정 -->
+                    <div class="sms-section">
+                        <h3 style="margin-bottom: 1rem; color: #333;">📱 SMS 알림 발송 시점 설정</h3>
+                        <div class="sms-timing-control" style="background: #f8f9fa; padding: 1.5rem; border-radius: 8px; border-left: 4px solid #28a745;">
+                            <div class="current-setting" style="margin-bottom: 1rem;">
+                                <h4 style="margin-bottom: 0.5rem; color: #333;">현재 설정</h4>
+                                <div id="currentNotifyTimingDisplay" style="font-size: 1.2rem; font-weight: bold; color: #28a745;">
+                                    앞 대기자가 2명 남았을 때 알림 발송
+                                </div>
+                            </div>
+                            
+                            <div class="setting-controls" style="display: flex; gap: 1rem; align-items: center; margin-bottom: 1rem;">
+                                <label for="notifyTiming" style="color: #333; font-weight: 500;">앞 대기자가</label>
+                                <select id="notifyTiming" style="padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
+                                    <option value="1">1명 남았을 때</option>
+                                    <option value="2" selected>2명 남았을 때</option>
+                                    <option value="3">3명 남았을 때</option>
+                                    <option value="4">4명 남았을 때</option>
+                                    <option value="5">5명 남았을 때</option>
+                                </select>
+                                <span style="color: #666;">알림 발송</span>
+                                <button id="updateNotifyTimingBtn" class="btn btn-success" onclick="updateNotifyTiming()">
+                                    설정 변경
+                                </button>
+                            </div>
+                            
+                            <div class="timing-info" style="background: #e8f5e8; padding: 1rem; border-radius: 6px; border: 1px solid #c3e6cb;">
+                                <h5 style="margin-bottom: 0.5rem; color: #155724;">💡 설정 안내</h5>
+                                <ul style="margin-left: 1.5rem; line-height: 1.6; color: #155724; font-size: 0.9rem;">
+                                    <li>환자가 접수 시 선택한 알림 시점과 관계없이, 이 설정값이 우선 적용됩니다.</li>
+                                    <li>예: "2명 남았을 때"로 설정하면, 환자의 앞 대기자가 2명일 때 알림이 발송됩니다.</li>
+                                    <li>대기 인원이 3명 이상일 때만 알림이 발송됩니다.</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Chart.js 라이브러리 -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        // API URL을 동적으로 설정 (휴대폰 접속 시 네트워크 IP 사용)
+        function getApiBaseUrl() {
+            const hostname = window.location.hostname;
+            const port = '8081';
+            
+            if (hostname === 'localhost' || hostname === '127.0.0.1') {
+                // localhost 접속 시 실제 네트워크 IP 사용
+                return 'http://192.168.70.26:8081/api';
+            } else {
+                // 실제 호스트명으로 접속 시 그대로 사용
+                return `http://${hostname}:${port}/api`;
+            }
+        }
+        
+        const API_BASE_URL = getApiBaseUrl();
+        let currentTab = 'pending';
+        
+        // WebSocket 연결 설정
+        let stompClient = null;
+        let isConnected = false;
+
+        function connectWebSocket() {
+            const socket = new SockJS(`${API_BASE_URL.replace('/api', '')}/ws`);
+            stompClient = Stomp.over(socket);
+            
+            stompClient.connect({}, function(frame) {
+                console.log('WebSocket 연결 성공:', frame);
+                isConnected = true;
+                
+                // 대기열 업데이트 구독
+                stompClient.subscribe('/topic/waiting-queue', function(message) {
+                    const data = JSON.parse(message.body);
+                    console.log('대기열 업데이트 수신:', data);
+                    
+                    if (data.type === 'QUEUE_UPDATE') {
+                        // 접수 목록 자동 새로고침
+                        loadData();
+                        loadConfirmedPatients();
+                    }
+                });
+                
+                // 처방전 업데이트 구독
+                stompClient.subscribe('/topic/prescription-update', function(message) {
+                    const data = JSON.parse(message.body);
+                    console.log('처방전 업데이트 수신:', data);
+                    
+                    if (data.type === 'PRESCRIPTION_UPDATE') {
+                        // 처방전 목록 자동 새로고침
+                        loadPendingPrescriptions();
+                    }
+                });
+                
+            }, function(error) {
+                console.error('WebSocket 연결 실패:', error);
+                isConnected = false;
+                
+                // 재연결 시도
+                setTimeout(() => {
+                    console.log('WebSocket 재연결 시도...');
+                    connectWebSocket();
+                }, 5000);
+            });
+        }
+
+        // 페이지 로드 시 초기화
+        document.addEventListener('DOMContentLoaded', function() {
+            checkPassword();
+            loadData();
+            connectWebSocket();
+            loadNotifyTimingSettings();
+            
+            // 환자 접수 폼 초기화 (대기 인원에 따른 SMS 알림 설정)
+            openGeneralRegisterForm();
+            
+            // 탭 전환 이벤트 리스너
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.addEventListener('click', function() {
+                    switchTab(this.dataset.tab);
+                });
+            });
+            
+            // 수기 접수 폼 제출 이벤트 리스너
+            document.getElementById('manualRegisterForm').addEventListener('submit', handleManualRegister);
+            
+            // 환자 이름 입력 시 자동완성 기능
+            document.getElementById('manualName').addEventListener('input', function() {
+                const name = this.value.trim();
+                if (name.length >= 2) {
+                    searchPatientByName(name);
+                } else {
+                    document.getElementById('patientSuggestions').style.display = 'none';
+                    clearExistingPatientInfo();
+                }
+            });
+            
+            // 환자 이름 입력 필드에서 포커스 아웃 시 제안 목록 숨기기 (약간의 지연 후)
+            document.getElementById('manualName').addEventListener('blur', function() {
+                setTimeout(() => {
+                    document.getElementById('patientSuggestions').style.display = 'none';
+                }, 200);
+            });
+            
+            // 정기적으로 데이터 새로고침 (30초마다)
+            setInterval(() => {
+                if (currentTab === 'pending') {
+                    loadPendingReceptions();
+                } else if (currentTab === 'confirmed') {
+                    loadConfirmedReceptions();
+                } else if (currentTab === 'prescriptions') {
+                    loadPendingPrescriptions();
+                }
+            }, 30000);
+        });
+
+        // 탭 전환
+        function switchTab(tabName) {
+            // 탭 버튼 활성화
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
+
+            // 탭 컨텐츠 표시
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.style.display = 'none';
+            });
+            document.getElementById(`${tabName}Tab`).style.display = 'block';
+
+            currentTab = tabName;
+            
+            // 각 탭별 초기 로드
+            if (tabName === 'statistics') {
+                loadStatistics('today');
+            } else if (tabName === 'sms') {
+                loadSmsMode();
+                loadWaitingTimeSettings();
+                loadNotifyTimingSettings();
+            }
+        }
+
+        // 데이터 로드
+        function loadData() {
+            loadStats();
+            loadPendingReceptions();
+            loadConfirmedReceptions();
+            loadPendingPrescriptions();
+        }
+
+        // 통계 로드
+        function loadStats() {
+            fetch(`${API_BASE_URL}/statistics/today`)
+                .then(response => response.json())
+                .then(stats => {
+                    document.getElementById('todayTotal').textContent = stats.totalReceptions;
+                })
+                .catch(error => {
+                    console.error('통계 로드 실패:', error);
+                });
+        }
+
+        // 대기 중 접수 로드
+        function loadPendingReceptions() {
+            fetch(`${API_BASE_URL}/nurse/pending`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                    return response.json();
+                })
+                .then(receptions => {
+                    // 배열인지 확인
+                    if (!Array.isArray(receptions)) {
+                        console.error('응답이 배열이 아닙니다:', receptions);
+                        receptions = [];
+                    }
+                    document.getElementById('pendingCount').textContent = receptions.length;
+                    renderReceptions('pending', receptions);
+                    
+                    // 대기 인원 변경 시 SMS 알림 설정 업데이트
+                    const pendingCount = receptions.filter(r => r.status === 'pending').length;
+                    updateManualNotifyRadios(pendingCount);
+                    if (pendingCount < 3) {
+                        document.getElementById('manualNotifyYes').checked = false;
+                        document.getElementById('manualNotifyNo').checked = true;
+                    }
+                })
+                .catch(error => {
+                    console.error('대기 중 접수 로드 실패:', error);
+                    document.getElementById('pendingList').innerHTML = '<div class="empty-state"><h3>데이터를 불러올 수 없습니다</h3><p>' + error.message + '</p></div>';
+                    document.getElementById('pendingCount').textContent = '0';
+                })
+                .finally(() => {
+                    document.getElementById('pendingLoading').style.display = 'none';
+                });
+        }
+
+        // 확인된 접수 로드
+        function loadConfirmedReceptions() {
+            fetch(`${API_BASE_URL}/nurse/confirmed`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                    return response.json();
+                })
+                .then(receptions => {
+                    // 배열인지 확인
+                    if (!Array.isArray(receptions)) {
+                        console.error('응답이 배열이 아닙니다:', receptions);
+                        receptions = [];
+                    }
+                    document.getElementById('confirmedCount').textContent = receptions.length;
+                    renderReceptions('confirmed', receptions);
+                })
+                .catch(error => {
+                    console.error('확인된 접수 로드 실패:', error);
+                    document.getElementById('confirmedList').innerHTML = '<div class="empty-state"><h3>데이터를 불러올 수 없습니다</h3><p>' + error.message + '</p></div>';
+                    document.getElementById('confirmedCount').textContent = '0';
+                })
+                .finally(() => {
+                    document.getElementById('confirmedLoading').style.display = 'none';
+                });
+        }
+
+        // 접수 목록 렌더링
+        function renderReceptions(type, receptions) {
+            const container = document.getElementById(`${type}List`);
+            
+            // 안전성 검사
+            if (!Array.isArray(receptions)) {
+                console.error('renderReceptions: receptions가 배열이 아닙니다:', receptions);
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <h3>⚠️ 데이터 형식 오류</h3>
+                        <p>서버에서 잘못된 형식의 데이터를 받았습니다.</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            if (receptions.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <h3>📋 ${type === 'pending' ? '대기 중인' : '확인된'} 접수가 없습니다</h3>
+                        <p>${type === 'pending' ? '새로운 접수를 기다리고 있습니다.' : '모든 접수가 처리되었습니다.'}</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = receptions.map(reception => `
+                <div class="reception-item ${type}">
+                    <div class="reception-header">
+                        <div class="patient-name">${reception.patientName}</div>
+                        <div class="reception-time">${formatDateTime(reception.createdAt)}</div>
+                    </div>
+                    <div class="reception-details">
+                        <div class="detail-item">
+                            <strong>전화번호:</strong> ${reception.phoneNumber || '없음'}
+                        </div>
+                        <div class="detail-item">
+                            <strong>접수자:</strong> ${reception.isGuardian ? '보호자' : '본인'}
+                        </div>
+                        <div class="detail-item">
+                            <strong>알림:</strong> ${reception.notifyAt ? `${reception.notifyAt}명 남았을 때` : '없음'}
+                        </div>
+                        <div class="detail-item">
+                            <strong>상태:</strong> <span class="status-badge status-${type}">${getStatusText(reception.status)}</span>
+                        </div>
+                    </div>
+                    <div style="margin-top: 1rem;">
+                        ${type === 'pending' ? `
+                            <button class="btn btn-success" onclick="confirmReception(${reception.id})" style="margin-right: 0.5rem;">
+                                ✓ 신분증 확인
+                            </button>
+                            <button class="btn btn-danger" onclick="deleteReception(${reception.id}, '${reception.patientName}')" style="font-size: 0.8rem;">
+                                🗑️ 삭제
+                            </button>
+                        ` : `
+                            <button class="btn btn-danger" onclick="deleteReception(${reception.id}, '${reception.patientName}')" style="font-size: 0.8rem;">
+                                🗑️ 삭제
+                            </button>
+                        `}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // 접수 확인
+        function confirmReception(receptionId) {
+            if (!confirm('신분증을 확인하셨습니까?')) {
+                return;
+            }
+
+            fetch(`${API_BASE_URL}/nurse/confirm/${receptionId}`, {
+                method: 'POST'
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('접수 확인 실패');
+                }
+                return response.json();
+            })
+            .then(result => {
+                alert('접수가 확인되었습니다.');
+                loadData(); // 데이터 새로고침
+            })
+            .catch(error => {
+                console.error('접수 확인 실패:', error);
+                alert('접수 확인에 실패했습니다.');
+            });
+        }
+
+        // 수기 접수 처리
+        function handleManualRegister(e) {
+            e.preventDefault();
+            
+            // 필수 필드 검증
+            const name = document.getElementById('manualName').value;
+            const birthDate = document.getElementById('manualBirthDate').value;
+            
+            if (!name) {
+                alert('이름을 입력해주세요.');
+                return;
+            }
+            
+            if (!birthDate) {
+                alert('생년월일을 입력해주세요.');
+                return;
+            }
+            
+            // 생년월일 형식 검증
+            const datePattern = /^\d{4}-\d{2}-\d{2}$/;
+            if (!datePattern.test(birthDate)) {
+                alert('생년월일을 YYYY-MM-DD 형식으로 입력해주세요. (예: 1990-01-15)');
+                return;
+            }
+            
+            // 날짜 유효성 검증
+            const dateObj = new Date(birthDate);
+            const today = new Date();
+            if (dateObj > today) {
+                alert('생년월일은 오늘 날짜보다 이전이어야 합니다.');
+                return;
+            }
+            
+            if (dateObj < new Date('1900-01-01')) {
+                alert('생년월일이 너무 오래되었습니다.');
+                return;
+            }
+            
+            const phoneNumber = document.getElementById('manualPhone').value;
+            const notifyEnabled = document.getElementById('manualNotifyYes').checked;
+            const symptoms = document.getElementById('manualSymptoms').value;
+            
+            // 간호사 설정에서 notifyAt 값 가져오기
+            const savedTiming = localStorage.getItem('notifyTiming');
+            const notifyAt = notifyEnabled ? (savedTiming ? parseInt(savedTiming) : 2) : null;
+            
+            const data = {
+                name: name,
+                birthDate: birthDate,
+                phoneNumber: phoneNumber || null,
+                isGuardian: false, // 동네 병원 특성상 기본값으로 본인 설정
+                notifyEnabled: notifyEnabled,
+                notifyAt: notifyAt,
+                symptoms: symptoms || null
+            };
+
+            console.log('수기 접수 데이터:', data); // 디버깅용
+
+            fetch(`${API_BASE_URL}/nurse/manual-register`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(data)
+            })
+            .then(response => {
+                if (!response.ok) {
+                    return response.text().then(text => {
+                        throw new Error(`수기 접수 실패: ${text}`);
+                    });
+                }
+                return response.json();
+            })
+            .then(result => {
+                alert(`수기 접수가 완료되었습니다.\n접수 번호: ${result.id}`);
+                // 폼 리셋
+                document.getElementById('manualName').value = '';
+                document.getElementById('manualBirthDate').value = '';
+                document.getElementById('manualPhone').value = '';
+                document.getElementById('manualNotify').value = '';
+                document.getElementById('manualSymptoms').value = '';
+                clearExistingPatientInfo();
+                currentSelectedPatient = null;
+                loadData(); // 데이터 새로고침
+            })
+            .catch(error => {
+                console.error('수기 접수 실패:', error);
+                alert('수기 접수에 실패했습니다: ' + error.message);
+            });
+        }
+
+        // 접수 삭제
+        function deleteReception(receptionId, patientName) {
+            const confirmation = confirm(`정말로 이 접수를 삭제하시겠습니까?\n\n환자명: ${patientName}\n접수 ID: ${receptionId}\n\n⚠️ 삭제된 접수는 복구할 수 없습니다.`);
+            
+            if (!confirmation) {
+                return;
+            }
+            
+            console.log('접수 삭제 요청:', { receptionId, patientName });
+            
+            fetch(`${API_BASE_URL}/nurse/reception/${receptionId}`, {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => {
+                if (!response.ok) {
+                    return response.text().then(text => {
+                        let errorMessage = '접수 삭제 실패';
+                        try {
+                            const errorData = JSON.parse(text);
+                            errorMessage = errorData.message || errorMessage;
+                        } catch (e) {
+                            if (text) {
+                                errorMessage = text;
+                            }
+                        }
+                        throw new Error(`HTTP ${response.status}: ${errorMessage}`);
+                    });
+                }
+                return response.json();
+            })
+            .then(result => {
+                console.log('접수 삭제 성공:', result);
+                alert(`접수가 삭제되었습니다.\n환자명: ${patientName}`);
+                
+                // 목록 새로고침
+                loadData();
+                loadConfirmedPatients(); // Vital Sign용 환자 목록 새로고침
+            })
+            .catch(error => {
+                console.error('접수 삭제 실패:', error);
+                alert('접수 삭제에 실패했습니다: ' + error.message);
+            });
+        }
+
+
+
+        // 날짜/시간 포맷팅
+        function formatDateTime(dateTimeString) {
+            const date = new Date(dateTimeString);
+            return date.toLocaleString('ko-KR', {
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+
+        // 날짜만 포맷팅 (처방전용)
+        function formatDate(dateTimeString) {
+            const date = new Date(dateTimeString);
+            return date.toLocaleDateString('ko-KR', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit'
+            });
+        }
+
+        // 상태 텍스트 변환
+        function getStatusText(status) {
+            const statusMap = {
+                'PENDING': '대기 중',
+                'CONFIRMED': '확인됨',
+                'CALLED': '호출됨',
+                'DONE': '완료',
+                'NO_RESPONSE': '미응답',
+                'CANCELED': '취소됨'
+            };
+            return statusMap[status] || status;
+        }
+
+        // 전화번호 자동 포맷팅
+        document.getElementById('manualPhone').addEventListener('input', function(e) {
+            let value = e.target.value.replace(/\D/g, '');
+            if (value.length >= 3 && value.length <= 7) {
+                value = value.replace(/(\d{3})(\d{1,4})/, '$1-$2');
+            } else if (value.length >= 8) {
+                value = value.replace(/(\d{3})(\d{4})(\d{1,4})/, '$1-$2-$3');
+            }
+            e.target.value = value;
+        });
+
+        // 생년월일 입력 자동 포맷팅
+        document.getElementById('manualBirthDate').addEventListener('input', function(e) {
+            let value = e.target.value.replace(/\D/g, '');
+            
+            // 자동으로 하이픈 추가
+            if (value.length >= 4) {
+                value = value.substring(0, 4) + '-' + value.substring(4);
+            }
+            if (value.length >= 7) {
+                value = value.substring(0, 7) + '-' + value.substring(7, 9);
+            }
+            
+            e.target.value = value;
+        });
+
+        // 이름 입력 시 환자 자동 완성
+        let currentSelectedPatient = null;
+        
+        function handleNameInput(event) {
+            const name = event.target.value.trim();
+            const suggestions = document.getElementById('patientSuggestions');
+            
+            if (name.length < 2) {
+                suggestions.style.display = 'none';
+                clearExistingPatientInfo();
+                return;
+            }
+            
+            // 환자 검색
+            fetch(`${API_BASE_URL}/nurse/search-patient?name=${encodeURIComponent(name)}`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('검색 실패');
+                    }
+                    return response.json();
+                })
+                .then(patients => {
+                    if (patients.length === 0) {
+                        suggestions.style.display = 'none';
+                        clearExistingPatientInfo();
+                    } else {
+                        showPatientSuggestions(patients);
+                    }
+                })
+                .catch(error => {
+                    console.error('환자 검색 실패:', error);
+                    suggestions.style.display = 'none';
+                    clearExistingPatientInfo();
+                });
+        }
+        
+        function showPatientSuggestions(patients) {
+            const suggestions = document.getElementById('patientSuggestions');
+            
+            suggestions.innerHTML = patients.map(patient => `
+                <div class="suggestion-item" onclick="selectExistingPatient(${patient.patientId})">
+                    <div class="suggestion-name">${patient.name}</div>
+                    <div class="suggestion-details">
+                        ${patient.birthDate} | ${patient.phoneNumber || '전화번호 없음'} | 방문 ${patient.totalVisits}회
+                        ${patient.lastVisit ? ` | 최근: ${formatDateTime(patient.lastVisit)}` : ''}
+                    </div>
+                </div>
+            `).join('');
+            
+            suggestions.style.display = 'block';
+        }
+        
+        function selectExistingPatient(patientId) {
+            // 현재 검색된 환자 목록에서 선택된 환자 찾기
+            const name = document.getElementById('manualName').value;
+            
+            fetch(`${API_BASE_URL}/nurse/search-patient?name=${encodeURIComponent(name)}`)
+                .then(response => response.json())
+                .then(patients => {
+                    const patient = patients.find(p => p.patientId === patientId);
+                    if (patient) {
+                        currentSelectedPatient = patient;
+                        
+                        // 폼에 정보 자동 입력
+                        document.getElementById('manualName').value = patient.name;
+                        document.getElementById('manualBirthDate').value = patient.birthDate;
+                        document.getElementById('manualPhone').value = patient.phoneNumber || '';
+                        
+                        // 기존 환자 정보 표시
+                        showExistingPatientInfo(patient);
+                        
+                        // 제안 목록 숨기기
+                        document.getElementById('patientSuggestions').style.display = 'none';
+                    }
+                })
+                .catch(error => {
+                    console.error('환자 정보 로드 실패:', error);
+                });
+        }
+        
+        function showExistingPatientInfo(patient) {
+            currentSelectedPatient = patient;
+            document.getElementById('existingPatientName').textContent = patient.name;
+            document.getElementById('existingPatientBirth').textContent = patient.birthDate;
+            document.getElementById('existingPatientPhone').textContent = patient.phoneNumber || '전화번호 없음';
+            document.getElementById('existingVisitCount').textContent = patient.totalVisits;
+            document.getElementById('existingLastVisit').textContent = patient.lastVisit ? formatDateTime(patient.lastVisit) : '없음';
+            
+            // 최근 증상 표시
+            if (patient.latestSurvey && patient.latestSurvey.symptoms) {
+                document.getElementById('existingSymptomsText').textContent = patient.latestSurvey.symptoms;
+                document.getElementById('existingSymptoms').style.display = 'block';
+            } else {
+                document.getElementById('existingSymptoms').style.display = 'none';
+            }
+            
+            document.getElementById('existingPatientInfo').style.display = 'block';
+            document.getElementById('existingPatientBasicInfo').style.display = 'flex';
+            document.getElementById('editPatientForm').style.display = 'none';
+        }
+        
+        function clearExistingPatientInfo() {
+            currentSelectedPatient = null;
+            document.getElementById('existingPatientInfo').style.display = 'none';
+        }
+        
+        function searchPatientByName(name) {
+            if (name.length < 2) {
+                document.getElementById('patientSuggestions').style.display = 'none';
+                clearExistingPatientInfo();
+                return;
+            }
+            
+            fetch(`${API_BASE_URL}/nurse/search-patient?name=${encodeURIComponent(name)}`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('환자 검색 실패');
+                    }
+                    return response.json();
+                })
+                .then(patients => {
+                    if (patients && patients.length > 0) {
+                        showPatientSuggestions(patients);
+                    } else {
+                        document.getElementById('patientSuggestions').style.display = 'none';
+                        clearExistingPatientInfo();
+                    }
+                })
+                .catch(error => {
+                    console.error('환자 검색 실패:', error);
+                    document.getElementById('patientSuggestions').style.display = 'none';
+                    clearExistingPatientInfo();
+                });
+        }
+
+        // 처방전 관련 함수들
+        function loadPendingPrescriptions() {
+            document.getElementById('prescriptionLoading').style.display = 'block';
+            
+            fetch(`${API_BASE_URL}/nurse/prescriptions/pending`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                    return response.json();
+                })
+                .then(prescriptions => {
+                    document.getElementById('pendingPrescriptionCount').textContent = prescriptions.length;
+                    renderPrescriptions(prescriptions);
+                })
+                .catch(error => {
+                    console.error('처방전 로드 실패:', error);
+                    document.getElementById('prescriptionList').innerHTML = '<div class="empty-state"><h3>처방전을 불러올 수 없습니다</h3><p>' + error.message + '</p></div>';
+                    document.getElementById('pendingPrescriptionCount').textContent = '0';
+                })
+                .finally(() => {
+                    document.getElementById('prescriptionLoading').style.display = 'none';
+                });
+        }
+
+        function renderPrescriptions(prescriptions) {
+            const container = document.getElementById('prescriptionList');
+            
+            if (prescriptions.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <h3>�� 출력 대기 중인 처방전이 없습니다</h3>
+                        <p>모든 처방전이 출력되었습니다.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = prescriptions.map(prescription => `
+                <div class="reception-item prescription-item" style="border-left: 4px solid #17a2b8;">
+                    <div class="reception-header">
+                        <div class="patient-name">${prescription.patientName}</div>
+                        <div class="reception-time">${formatDateTime(prescription.createdAt)}</div>
+                    </div>
+                    <div class="reception-details">
+                        <div class="detail-item">
+                            <strong>생년월일:</strong> ${prescription.patientBirthDate}
+                        </div>
+                        <div class="detail-item">
+                            <strong>진단명:</strong> ${prescription.diagnosis ? prescription.diagnosis.replace(/\n/g, ', ') : '-'}
+                        </div>
+                        <div class="detail-item">
+                            <strong>증상:</strong> ${prescription.symptoms || '-'}
+                        </div>
+                        <div class="detail-item">
+                            <strong>처방 약물:</strong> ${prescription.medications ? prescription.medications.substring(0, 50) + (prescription.medications.length > 50 ? '...' : '') : '-'}
+                        </div>
+                        <div class="detail-item">
+                            <strong>의사 소견:</strong> ${prescription.notes || '-'}
+                        </div>
+                        <div class="detail-item">
+                            <strong>재진 날짜:</strong> ${prescription.followUpDate ? new Date(prescription.followUpDate).toLocaleString('ko-KR') : '-'}
+                        </div>
+                    </div>
+                    <div style="margin-top: 1rem;">
+                        <button class="btn btn-primary" onclick="viewPrescriptionDetail(${prescription.id})">
+                            <i class="fas fa-eye"></i> 상세보기
+                        </button>
+                        <button class="btn btn-info" onclick="printPrescriptionBrowser(${prescription.id})">
+                            <i class="fas fa-print"></i> 프린트
+                        </button>
+                        <button class="btn btn-success" onclick="printPrescription(${prescription.id})">
+                            <i class="fas fa-check"></i> 출력완료
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function viewPrescriptionDetail(prescriptionId) {
+            // 처방전 상세 정보를 모달로 표시
+            fetch(`${API_BASE_URL}/doctor/prescriptions/${prescriptionId}`)
+                .then(response => response.json())
+                .then(prescription => {
+                    // 약물 정보 파싱 (의사 페이지 형식에 맞춤)
+                    const medications = prescription.medications ? prescription.medications.split('\n').filter(med => med.trim()) : [];
+                    const medicationRows = medications.map(med => {
+                        // 약물 정보를 더 상세하게 파싱
+                        let name = '';
+                        let dosage = '';
+                        let frequency = '';
+                        let days = '';
+                        let instructions = '';
+                        let coverage = '';
+                        
+                        // 예시: "타이레놀 500mg - 1일 3회, 3일분, 식후 30분 (급여)"
+                        const parts = med.split(' - ');
+                        if (parts.length >= 1) {
+                            name = parts[0].trim();
+                        }
+                        if (parts.length >= 2) {
+                            const detailParts = parts[1].split(',');
+                            detailParts.forEach(part => {
+                                const trimmed = part.trim();
+                                if (trimmed.includes('일 ') && trimmed.includes('회')) {
+                                    frequency = trimmed;
+                                } else if (trimmed.includes('일분')) {
+                                    days = trimmed;
+                                } else if (trimmed.includes('식') || trimmed.includes('취침') || trimmed.includes('아침') || trimmed.includes('저녁')) {
+                                    instructions = trimmed;
+                                } else if (trimmed.includes('급여') || trimmed.includes('비급여')) {
+                                    coverage = trimmed.replace(/[()]/g, '');
+                                } else if (!frequency && !days && !instructions) {
+                                    // 첫 번째 항목이 용량일 가능성
+                                    if (trimmed.includes('mg') || trimmed.includes('g') || trimmed.includes('ml')) {
+                                        dosage = trimmed;
+                                    } else {
+                                        frequency = trimmed;
+                                    }
+                                }
+                            });
+                        }
+                        
+                        // 용량이 이름에 포함되어 있을 수 있음
+                        if (!dosage && name.includes('mg')) {
+                            const nameParts = name.split(' ');
+                            const dosagePart = nameParts.find(part => part.includes('mg') || part.includes('g') || part.includes('ml'));
+                            if (dosagePart) {
+                                dosage = dosagePart;
+                                name = nameParts.filter(part => part !== dosagePart).join(' ');
+                            }
+                        }
+                        
+                        return `
+                            <tr>
+                                <td>${name || '약물명 미입력'}</td>
+                                <td>${[dosage, frequency, instructions].filter(Boolean).join(', ') || '-'}</td>
+                                <td>${days || '-'}</td>
+                                <td>${coverage || '-'}</td>
+                            </tr>
+                        `;
+                    }).join('');
+
+                    const modalContent = `
+                        <div style="max-width: 900px; margin: 20px auto; background: white; padding: 0; border-radius: 10px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); overflow: hidden;">
+                            <!-- EMR 양식 처방전 -->
+                            <div class="prescription-preview" style="
+                                background: white;
+                                border: 2px solid #333;
+                                border-radius: 8px;
+                                padding: 30px;
+                                margin: 0;
+                                font-family: 'Malgun Gothic', '맑은 고딕', sans-serif;
+                                box-shadow: none;
+                            ">
+                                <div class="prescription-header" style="
+                                    display: flex;
+                                    justify-content: space-between;
+                                    align-items: flex-start;
+                                    border-bottom: 3px solid #333;
+                                    padding-bottom: 20px;
+                                    margin-bottom: 30px;
+                                ">
+                                    <div class="clinic-info" style="text-align: left;">
+                                        <h2 style="color: #333; font-size: 1.8em; margin-bottom: 5px;">서대 병원</h2>
+                                        <p style="color: #666; font-size: 0.9em; margin: 2px 0;">충북 청주시 서원구 무심서로 377-3 서원대학교 (우: 28674)</p>
+                                        <p style="color: #666; font-size: 0.9em; margin: 2px 0;">전화: 02-1234-5678 | 팩스: 02-1234-5679</p>
+                                    </div>
+                                    <div class="prescription-title" style="text-align: center;">
+                                        <h1 style="color: #333; font-size: 2.2em; margin-bottom: 10px; letter-spacing: 2px;">처 방 전</h1>
+                                        <p style="color: #666; font-size: 1em;">발행일: ${new Date(prescription.createdAt).toLocaleDateString('ko-KR')}</p>
+                                    </div>
+                                </div>
+                                
+                                <div class="prescription-content">
+                                    <div class="patient-info-section" style="margin-bottom: 30px;">
+                                        <table class="patient-info-table" style="
+                                            width: 100%;
+                                            border-collapse: collapse;
+                                            border: 2px solid #333;
+                                        ">
+                                            <tr>
+                                                <td style="padding: 12px 15px; border: 1px solid #333; font-size: 1em; background: #f8f9fa; width: 120px; font-weight: 600;"><strong>환자성명:</strong></td>
+                                                <td style="padding: 12px 15px; border: 1px solid #333; font-size: 1em;">${prescription.patientName}</td>
+                                                <td style="padding: 12px 15px; border: 1px solid #333; font-size: 1em; background: #f8f9fa; width: 120px; font-weight: 600;"><strong>생년월일:</strong></td>
+                                                <td style="padding: 12px 15px; border: 1px solid #333; font-size: 1em;">${prescription.patientBirthDate || '-'}</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="padding: 12px 15px; border: 1px solid #333; font-size: 1em; background: #f8f9fa; width: 120px; font-weight: 600;"><strong>진단명:</strong></td>
+                                                <td colspan="3" style="padding: 12px 15px; border: 1px solid #333; font-size: 1em;">${prescription.diagnosis ? prescription.diagnosis.replace(/\n/g, ', ') : '-'}</td>
+                                            </tr>
+                                        </table>
+                                    </div>
+                                    
+                                    <div class="prescription-section" style="margin-bottom: 25px;">
+                                        <h3 style="color: #333; font-size: 1.3em; margin-bottom: 15px; padding-bottom: 8px; border-bottom: 2px solid #333;">처방내역</h3>
+                                        <table class="prescription-table" style="
+                                            width: 100%;
+                                            border-collapse: collapse;
+                                            border: 2px solid #333;
+                                        ">
+                                            <thead>
+                                                <tr>
+                                                    <th style="padding: 12px 15px; border: 1px solid #333; text-align: left; background: #f8f9fa; font-weight: 600; color: #333;">약품명</th>
+                                                    <th style="padding: 12px 15px; border: 1px solid #333; text-align: left; background: #f8f9fa; font-weight: 600; color: #333;">용법·용량</th>
+                                                    <th style="padding: 12px 15px; border: 1px solid #333; text-align: left; background: #f8f9fa; font-weight: 600; color: #333;">투약일수</th>
+                                                    <th style="padding: 12px 15px; border: 1px solid #333; text-align: left; background: #f8f9fa; font-weight: 600; color: #333;">비고</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                ${medicationRows || '<tr><td colspan="4" style="padding: 12px 15px; border: 1px solid #333; text-align: center;">처방 없음</td></tr>'}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    
+
+                                    
+                                    <!-- 의사 소견 -->
+                                    <div class="prescription-section" style="margin-bottom: 25px;">
+                                        <h3 style="color: #333; font-size: 1.3em; margin-bottom: 15px; padding-bottom: 8px; border-bottom: 2px solid #333;">의사 소견</h3>
+                                        <div class="notes-box" style="
+                                            border: 2px solid #333;
+                                            padding: 15px;
+                                            background: #f8f9fa;
+                                            min-height: 60px;
+                                            border-radius: 4px;
+                                        ">
+                                            ${prescription.notes || '특이사항 없음'}
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="prescription-section" style="margin-bottom: 25px;">
+                                        <h3 style="color: #333; font-size: 1.3em; margin-bottom: 15px; padding-bottom: 8px; border-bottom: 2px solid #333;">재진 예정일</h3>
+                                        <div class="followup-box" style="
+                                            border: 2px solid #333;
+                                            padding: 15px;
+                                            background: #f8f9fa;
+                                            min-height: 60px;
+                                            border-radius: 4px;
+                                        ">
+                                            ${prescription.followUpDate ? new Date(prescription.followUpDate).toLocaleString('ko-KR') : '재진 예정 없음'}
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="prescription-footer" style="
+                                        margin-top: 40px;
+                                        display: flex;
+                                        justify-content: space-between;
+                                        align-items: flex-end;
+                                    ">
+                                        <div class="doctor-info" style="text-align: left;">
+                                            <p style="margin: 5px 0; font-size: 1em;"><strong>처방의사:</strong> 강찬희 (면허번호: 12345)</p>
+                                            <p style="margin: 5px 0; font-size: 1em;"><strong>의료기관:</strong> 서대 병원</p>
+                                        </div>
+                                        <div class="prescription-note" style="text-align: right; font-size: 0.9em; color: #666;">
+                                            <p style="margin: 3px 0;">※ 의약품 복용 시 주의사항을 반드시 확인하시기 바랍니다.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- 버튼 영역 -->
+                            <div style="text-align: center; padding: 20px; background: #f8f9fa; border-top: 1px solid #e9ecef;">
+                                <button onclick="printPrescriptionBrowser(${prescription.id})" style="background: #007bff; color: white; padding: 12px 24px; border: none; border-radius: 6px; margin-right: 10px; cursor: pointer; font-size: 1em;">
+                                    <i class="fas fa-print"></i> 프린트 출력
+                                </button>
+                                <button onclick="printPrescription(${prescription.id})" style="background: #28a745; color: white; padding: 12px 24px; border: none; border-radius: 6px; margin-right: 10px; cursor: pointer; font-size: 1em;">
+                                    <i class="fas fa-check"></i> 출력 완료
+                                </button>
+                                <button onclick="closeModal()" style="background: #6c757d; color: white; padding: 12px 24px; border: none; border-radius: 6px; cursor: pointer; font-size: 1em;">
+                                    <i class="fas fa-times"></i> 닫기
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                    
+                    // 모달 배경 생성
+                    const modal = document.createElement('div');
+                    modal.id = 'prescriptionModal';
+                    modal.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; overflow-y: auto; padding: 20px 0;';
+                    modal.innerHTML = modalContent;
+                    
+                    document.body.appendChild(modal);
+                    
+                    // 모달 외부 클릭 시 닫기
+                    modal.addEventListener('click', function(e) {
+                        if (e.target === modal) {
+                            closeModal();
+                        }
+                    });
+                })
+                .catch(error => {
+                    console.error('처방전 상세 정보 로드 실패:', error);
+                    alert('처방전 정보를 불러올 수 없습니다.');
+                });
+        }
+
+        function closeModal() {
+            const modal = document.getElementById('prescriptionModal');
+            if (modal) {
+                modal.remove();
+            }
+        }
+
+        // 브라우저 프린트 기능
+        function printPrescriptionBrowser(prescriptionId) {
+            // 처방전 정보 가져오기
+            fetch(`${API_BASE_URL}/doctor/prescriptions/${prescriptionId}`)
+                .then(response => response.json())
+                .then(prescription => {
+                    // 약물 정보 파싱
+                    const medications = prescription.medications ? prescription.medications.split('\n').filter(med => med.trim()) : [];
+                    const medicationRows = medications.map(med => {
+                        let name = '';
+                        let dosage = '';
+                        let frequency = '';
+                        let days = '';
+                        let instructions = '';
+                        let coverage = '';
+                        
+                        const parts = med.split(' - ');
+                        if (parts.length >= 1) {
+                            name = parts[0].trim();
+                        }
+                        if (parts.length >= 2) {
+                            const detailParts = parts[1].split(',');
+                            detailParts.forEach(part => {
+                                const trimmed = part.trim();
+                                if (trimmed.includes('일 ') && trimmed.includes('회')) {
+                                    frequency = trimmed;
+                                } else if (trimmed.includes('일분')) {
+                                    days = trimmed;
+                                } else if (trimmed.includes('식') || trimmed.includes('취침') || trimmed.includes('아침') || trimmed.includes('저녁')) {
+                                    instructions = trimmed;
+                                } else if (trimmed.includes('급여') || trimmed.includes('비급여')) {
+                                    coverage = trimmed.replace(/[()]/g, '');
+                                } else if (!frequency && !days && !instructions) {
+                                    if (trimmed.includes('mg') || trimmed.includes('g') || trimmed.includes('ml')) {
+                                        dosage = trimmed;
+                                    } else {
+                                        frequency = trimmed;
+                                    }
+                                }
+                            });
+                        }
+                        
+                        if (!dosage && name.includes('mg')) {
+                            const nameParts = name.split(' ');
+                            const dosagePart = nameParts.find(part => part.includes('mg') || part.includes('g') || part.includes('ml'));
+                            if (dosagePart) {
+                                dosage = dosagePart;
+                                name = nameParts.filter(part => part !== dosagePart).join(' ');
+                            }
+                        }
+                        
+                        return `
+                            <tr>
+                                <td>${name || '약물명 미입력'}</td>
+                                <td>${[dosage, frequency, instructions].filter(Boolean).join(', ') || '-'}</td>
+                                <td>${days || '-'}</td>
+                                <td>${coverage || '-'}</td>
+                            </tr>
+                        `;
+                    }).join('');
+
+                    // 새 창에서 처방전 열기
+                    const printWindow = window.open('', '_blank', 'width=800,height=600');
+                    printWindow.document.write(`
+                        <!DOCTYPE html>
+                        <html>
+                        <head>
+                            <title>처방전 - ${prescription.patientName}</title>
+                            <style>
+                                body { font-family: 'Malgun Gothic', '맑은 고딕', sans-serif; margin: 0; padding: 20px; }
+                                .prescription-preview {
+                                    background: white;
+                                    border: 2px solid #333;
+                                    border-radius: 8px;
+                                    padding: 30px;
+                                    margin: 0;
+                                    box-shadow: none;
+                                }
+                                .prescription-header {
+                                    display: flex;
+                                    justify-content: space-between;
+                                    align-items: flex-start;
+                                    border-bottom: 3px solid #333;
+                                    padding-bottom: 20px;
+                                    margin-bottom: 30px;
+                                }
+                                .clinic-info { text-align: left; }
+                                .clinic-info h2 { color: #333; font-size: 1.8em; margin-bottom: 5px; }
+                                .clinic-info p { color: #666; font-size: 0.9em; margin: 2px 0; }
+                                .prescription-title { text-align: center; }
+                                .prescription-title h1 { color: #333; font-size: 2.2em; margin-bottom: 10px; letter-spacing: 2px; }
+                                .prescription-title p { color: #666; font-size: 1em; }
+                                .patient-info-section { margin-bottom: 30px; }
+                                .patient-info-table { width: 100%; border-collapse: collapse; border: 2px solid #333; }
+                                .patient-info-table td { padding: 12px 15px; border: 1px solid #333; font-size: 1em; }
+                                .patient-info-table td:first-child, .patient-info-table td:nth-child(3) { background: #f8f9fa; width: 120px; font-weight: 600; }
+                                .prescription-section { margin-bottom: 25px; }
+                                .prescription-section h3 { color: #333; font-size: 1.3em; margin-bottom: 15px; padding-bottom: 8px; border-bottom: 2px solid #333; }
+                                .prescription-table { width: 100%; border-collapse: collapse; border: 2px solid #333; }
+                                .prescription-table th, .prescription-table td { padding: 12px 15px; border: 1px solid #333; text-align: left; }
+                                .prescription-table th { background: #f8f9fa; font-weight: 600; color: #333; }
+                                .prescription-table tbody tr:nth-child(even) { background: #f9f9f9; }
+                                .notes-box, .followup-box { border: 2px solid #333; padding: 15px; background: #f8f9fa; min-height: 60px; border-radius: 4px; }
+                                .prescription-footer { margin-top: 40px; display: flex; justify-content: space-between; align-items: flex-end; }
+                                .doctor-info { text-align: left; }
+                                .doctor-info p { margin: 5px 0; font-size: 1em; }
+                                .prescription-note { text-align: right; font-size: 0.9em; color: #666; }
+                                .prescription-note p { margin: 3px 0; }
+                                @media print {
+                                    body { margin: 0; padding: 0; }
+                                    .prescription-preview { border: none; padding: 20px; }
+                                }
+                            </style>
+                        </head>
+                        <body>
+                            <div class="prescription-preview">
+                                <div class="prescription-header">
+                                    <div class="clinic-info">
+                                        <h2>서대 병원</h2>
+                                        <p>충북 청주시 서원구 무심서로 377-3 서원대학교 (우: 28674)</p>
+                                        <p>전화: 02-1234-5678 | 팩스: 02-1234-5679</p>
+                                    </div>
+                                    <div class="prescription-title">
+                                        <h1>처 방 전</h1>
+                                        <p>발행일: ${new Date(prescription.createdAt).toLocaleDateString('ko-KR')}</p>
+                                    </div>
+                                </div>
+                                
+                                <div class="prescription-content">
+                                    <div class="patient-info-section">
+                                        <table class="patient-info-table">
+                                            <tr>
+                                                <td><strong>환자성명:</strong></td>
+                                                <td>${prescription.patientName}</td>
+                                                <td><strong>생년월일:</strong></td>
+                                                <td>${prescription.patientBirthDate || '-'}</td>
+                                            </tr>
+                                            <tr>
+                                                <td><strong>진단명:</strong></td>
+                                                <td colspan="3">${prescription.diagnosis ? prescription.diagnosis.replace(/\n/g, ', ') : '-'}</td>
+                                            </tr>
+                                        </table>
+                                    </div>
+                                    
+                                    <div class="prescription-section">
+                                        <h3>처방내역</h3>
+                                        <table class="prescription-table">
+                                            <thead>
+                                                <tr>
+                                                    <th>약품명</th>
+                                                    <th>용법·용량</th>
+                                                    <th>투약일수</th>
+                                                    <th>비고</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                ${medicationRows || '<tr><td colspan="4" style="text-align: center;">처방 없음</td></tr>'}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    
+                                    <div class="prescription-section">
+                                        <h3>의사 소견</h3>
+                                        <div class="notes-box">
+                                            ${prescription.notes || '특이사항 없음'}
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="prescription-section">
+                                        <h3>재진 예정일</h3>
+                                        <div class="followup-box">
+                                                                                         ${prescription.followUpDate ? new Date(prescription.followUpDate).toLocaleString('ko-KR') : '재진 예정 없음'}
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="prescription-footer">
+                                        <div class="doctor-info">
+                                            <p><strong>처방의사:</strong> 강찬희 (면허번호: 12345)</p>
+                                            <p><strong>의료기관:</strong> 서대 병원</p>
+                                        </div>
+                                        <div class="prescription-note">
+                                            <p>※ 의약품 복용 시 주의사항을 반드시 확인하시기 바랍니다.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </body>
+                        </html>
+                    `);
+                    
+                    printWindow.document.close();
+                    
+                    // 잠시 후 프린트 대화상자 열기
+                    setTimeout(() => {
+                        printWindow.print();
+                        
+                        // 프린트 후 창 닫기
+                        setTimeout(() => {
+                            printWindow.close();
+                        }, 100);
+                    }, 500);
+                })
+                .catch(error => {
+                    console.error('처방전 프린트 실패:', error);
+                    alert('처방전 프린트에 실패했습니다: ' + error.message);
+                });
+        }
+
+        // 출력 완료 처리
+        function printPrescription(prescriptionId) {
+            const confirmed = confirm('처방전을 출력하셨습니까?\n출력 완료 처리하면 목록에서 제거됩니다.');
+            if (!confirmed) {
+                return;
+            }
+
+            console.log('처방전 출력 완료 요청:', {
+                prescriptionId: prescriptionId,
+                apiUrl: `${API_BASE_URL}/nurse/prescriptions/${prescriptionId}/print`
+            });
+
+            fetch(`${API_BASE_URL}/nurse/prescriptions/${prescriptionId}/print`, {
+                method: 'GET'
+            })
+            .then(response => {
+                console.log('처방전 출력 완료 응답 상태:', response.status);
+                if (!response.ok) {
+                    return response.text().then(text => {
+                        let errorMessage = '처방전 출력 완료 처리 실패';
+                        try {
+                            const errorData = JSON.parse(text);
+                            errorMessage = errorData.message || errorMessage;
+                        } catch (e) {
+                            if (text) {
+                                errorMessage = text;
+                            }
+                        }
+                        throw new Error(`HTTP ${response.status}: ${errorMessage}`);
+                    });
+                }
+                return response.json();
+            })
+            .then(result => {
+                console.log('처방전 출력 완료 성공:', result);
+                alert(`처방전 출력이 완료되었습니다.\n환자명: ${result.patientName}`);
+                closeModal(); // 모달이 열려있으면 닫기
+                
+                // 처방전 출력 목록 새로고침
+                loadPendingPrescriptions();
+                
+                // 현재 탭이 처방전 출력 탭이면 즉시 반영
+                if (currentTab === 'prescriptions') {
+                    setTimeout(() => {
+                        loadPendingPrescriptions();
+                    }, 500); // 0.5초 후 한 번 더 새로고침
+                }
+            })
+            .catch(error => {
+                console.error('처방전 출력 완료 실패:', error);
+                alert('처방전 출력 완료 처리에 실패했습니다: ' + error.message);
+            });
+        }
+
+        // ========== 통계 관련 함수들 ==========
+        let currentPeriod = 'today';
+        let hourlyChart, weeklyChart, ageChart;
+
+        // 통계 로드
+        function loadStatistics(period) {
+            currentPeriod = period;
+            
+            // 버튼 활성화
+            document.querySelectorAll('.period-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            document.querySelector(`[data-period="${period}"]`).classList.add('active');
+
+            // 사용자 정의 기간 숨기기
+            document.getElementById('customPeriodDiv').style.display = 'none';
+
+            // 로딩 표시
+            document.getElementById('statisticsLoading').style.display = 'block';
+            document.getElementById('statisticsContent').style.display = 'none';
+
+            const url = `${API_BASE_URL}/nurse/statistics/${period}`;
+            
+            fetch(url)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    renderStatistics(data);
+                })
+                .catch(error => {
+                    console.error('통계 로드 실패:', error);
+                    document.getElementById('statisticsContent').innerHTML = `
+                        <div class="empty-state">
+                            <h3>⚠️ 통계를 불러올 수 없습니다</h3>
+                            <p>${error.message}</p>
+                        </div>
+                    `;
+                    document.getElementById('statisticsContent').style.display = 'block';
+                })
+                .finally(() => {
+                    document.getElementById('statisticsLoading').style.display = 'none';
+                });
+        }
+
+        // 사용자 정의 기간 표시
+        function showCustomPeriod() {
+            document.querySelectorAll('.period-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            document.querySelector('[data-period="custom"]').classList.add('active');
+            
+            document.getElementById('customPeriodDiv').style.display = 'block';
+            
+            // 기본값 설정 (지난 7일)
+            const today = new Date();
+            const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+            
+            document.getElementById('endDate').value = today.toISOString().split('T')[0];
+            document.getElementById('startDate').value = weekAgo.toISOString().split('T')[0];
+        }
+
+        // 사용자 정의 기간 통계 로드
+        function loadCustomStatistics() {
+            const startDate = document.getElementById('startDate').value;
+            const endDate = document.getElementById('endDate').value;
+
+            if (!startDate || !endDate) {
+                alert('시작일과 종료일을 모두 선택해주세요.');
+                return;
+            }
+
+            if (new Date(startDate) > new Date(endDate)) {
+                alert('시작일이 종료일보다 늦을 수 없습니다.');
+                return;
+            }
+
+            // 로딩 표시
+            document.getElementById('statisticsLoading').style.display = 'block';
+            document.getElementById('statisticsContent').style.display = 'none';
+
+            const url = `${API_BASE_URL}/nurse/statistics/custom?startDate=${startDate}&endDate=${endDate}`;
+            
+            fetch(url)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    renderStatistics(data);
+                })
+                .catch(error => {
+                    console.error('사용자 정의 통계 로드 실패:', error);
+                    alert('통계를 불러올 수 없습니다: ' + error.message);
+                })
+                .finally(() => {
+                    document.getElementById('statisticsLoading').style.display = 'none';
+                });
+        }
+
+        // 통계 렌더링
+        function renderStatistics(data) {
+            // 기본 통계 업데이트
+            document.getElementById('totalVisits').textContent = data.totalVisits || 0;
+            document.getElementById('totalNewPatients').textContent = data.totalNewPatients || 0;
+            document.getElementById('totalPrescriptions').textContent = data.totalPrescriptions || 0;
+            document.getElementById('averageWaitingTime').textContent = Math.round(data.averageWaitingTime || 0);
+
+            // 피크 시간 정보 업데이트
+            document.getElementById('busiestHour').textContent = data.busiestHour || '정보 없음';
+            document.getElementById('busiestDay').textContent = data.busiestDay || '정보 없음';
+
+            // 차트 렌더링
+            renderHourlyChart(data.hourlyStats || []);
+            renderWeeklyChart(data.weeklyStats || []);
+            renderAgeChart(data.ageGroupStats || []);
+
+            // 컨텐츠 표시
+            document.getElementById('statisticsContent').style.display = 'block';
+        }
+
+        // 시간대별 차트
+        function renderHourlyChart(hourlyStats) {
+            const ctx = document.getElementById('hourlyChart').getContext('2d');
+            
+            if (hourlyChart) {
+                hourlyChart.destroy();
+            }
+
+            const labels = [];
+            const data = [];
+            
+            // 0시부터 23시까지 모든 시간대 생성
+            for (let hour = 0; hour < 24; hour++) {
+                const timeRange = `${hour.toString().padStart(2, '0')}:00-${(hour + 1).toString().padStart(2, '0')}:00`;
+                labels.push(timeRange);
+                
+                const stat = hourlyStats.find(s => s.hour === hour);
+                data.push(stat ? stat.visitCount : 0);
+            }
+
+            hourlyChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: '방문자 수',
+                        data: data,
+                        backgroundColor: 'rgba(102, 126, 234, 0.6)',
+                        borderColor: 'rgba(102, 126, 234, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                stepSize: 1
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    }
+                }
+            });
+        }
+
+        // 요일별 차트
+        function renderWeeklyChart(weeklyStats) {
+            const ctx = document.getElementById('weeklyChart').getContext('2d');
+            
+            if (weeklyChart) {
+                weeklyChart.destroy();
+            }
+
+            const dayNames = ['월요일', '화요일', '수요일', '목요일', '금요일', '토요일', '일요일'];
+            const data = [];
+            
+            // 모든 요일 데이터 생성
+            for (let i = 1; i <= 7; i++) {
+                const stat = weeklyStats.find(s => s.dayOfWeek === i);
+                data.push(stat ? stat.visitCount : 0);
+            }
+
+            weeklyChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: dayNames,
+                    datasets: [{
+                        data: data,
+                        backgroundColor: [
+                            'rgba(255, 99, 132, 0.6)',
+                            'rgba(54, 162, 235, 0.6)',
+                            'rgba(255, 205, 86, 0.6)',
+                            'rgba(75, 192, 192, 0.6)',
+                            'rgba(153, 102, 255, 0.6)',
+                            'rgba(255, 159, 64, 0.6)',
+                            'rgba(199, 199, 199, 0.6)'
+                        ],
+                        borderColor: [
+                            'rgba(255, 99, 132, 1)',
+                            'rgba(54, 162, 235, 1)',
+                            'rgba(255, 205, 86, 1)',
+                            'rgba(75, 192, 192, 1)',
+                            'rgba(153, 102, 255, 1)',
+                            'rgba(255, 159, 64, 1)',
+                            'rgba(199, 199, 199, 1)'
+                        ],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+        }
+
+        // 연령대별 차트
+        function renderAgeChart(ageGroupStats) {
+            const ctx = document.getElementById('ageChart').getContext('2d');
+            
+            if (ageChart) {
+                ageChart.destroy();
+            }
+
+            if (ageGroupStats.length === 0) {
+                // 데이터가 없을 때 빈 차트 표시
+                ageChart = new Chart(ctx, {
+                    type: 'pie',
+                    data: {
+                        labels: ['데이터 없음'],
+                        datasets: [{
+                            data: [1],
+                            backgroundColor: ['rgba(200, 200, 200, 0.6)'],
+                            borderColor: ['rgba(200, 200, 200, 1)'],
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: {
+                                position: 'bottom'
+                            }
+                        }
+                    }
+                });
+                return;
+            }
+
+            const labels = ageGroupStats.map(stat => stat.ageGroup);
+            const data = ageGroupStats.map(stat => stat.visitCount);
+
+            ageChart = new Chart(ctx, {
+                type: 'pie',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: data,
+                        backgroundColor: [
+                            'rgba(255, 99, 132, 0.6)',
+                            'rgba(54, 162, 235, 0.6)',
+                            'rgba(255, 205, 86, 0.6)',
+                            'rgba(75, 192, 192, 0.6)',
+                            'rgba(153, 102, 255, 0.6)',
+                            'rgba(255, 159, 64, 0.6)',
+                            'rgba(199, 199, 199, 0.6)',
+                            'rgba(83, 102, 255, 0.6)'
+                        ],
+                        borderColor: [
+                            'rgba(255, 99, 132, 1)',
+                            'rgba(54, 162, 235, 1)',
+                            'rgba(255, 205, 86, 1)',
+                            'rgba(75, 192, 192, 1)',
+                            'rgba(153, 102, 255, 1)',
+                            'rgba(255, 159, 64, 1)',
+                            'rgba(199, 199, 199, 1)',
+                            'rgba(83, 102, 255, 1)'
+                        ],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+        }
+
+        // ========== 대기시간 설정 관련 함수들 ==========
+        
+        // 대기시간 설정 로드
+        function loadWaitingTimeSettings() {
+            const savedTime = localStorage.getItem('waitingTimePerPerson');
+            const timePerPerson = savedTime ? parseInt(savedTime) : 3; // 기본값 3분
+            
+            document.getElementById('waitingTimePerPerson').value = timePerPerson;
+            updateWaitingTimeDisplay(timePerPerson);
+        }
+        
+        // 대기시간 설정 업데이트
+        function updateWaitingTime() {
+            const timePerPerson = parseInt(document.getElementById('waitingTimePerPerson').value);
+            
+            if (timePerPerson < 1 || timePerPerson > 30) {
+                alert('대기시간은 1분에서 30분 사이로 설정해주세요.');
+                return;
+            }
+            
+            // 로컬 스토리지에 저장
+            localStorage.setItem('waitingTimePerPerson', timePerPerson);
+            
+            // 화면 업데이트
+            updateWaitingTimeDisplay(timePerPerson);
+            
+            alert(`대기시간이 1명당 ${timePerPerson}분으로 설정되었습니다.`);
+        }
+        
+        // 대기시간 표시 업데이트
+        function updateWaitingTimeDisplay(timePerPerson) {
+            document.getElementById('currentWaitingTimeDisplay').textContent = `1명당 ${timePerPerson}분`;
+            
+            // 미리보기 업데이트
+            const preview = document.getElementById('waitingTimePreview');
+            preview.innerHTML = `
+                <div>• 대기 0명: 0분</div>
+                <div>• 대기 1명: ${timePerPerson}분</div>
+                <div>• 대기 2명: ${timePerPerson * 2}분</div>
+                <div>• 대기 3명: ${timePerPerson * 3}분</div>
+                <div>• 대기 5명: ${timePerPerson * 5}분</div>
+            `;
+        }
+        
+        // 대기시간 계산 (다른 페이지에서 사용할 수 있도록 전역 함수)
+        function calculateWaitingTime(waitingCount) {
+            const timePerPerson = parseInt(localStorage.getItem('waitingTimePerPerson') || '3');
+            return waitingCount * timePerPerson;
+        }
+
+        // ========== SMS 관련 함수들 ==========
+
+        // SMS 모드 상태 로드
+        function loadSmsMode() {
+            fetch(`${API_BASE_URL}/nurse/sms-mode`)
+                .then(response => response.json())
+                .then(data => {
+                    const modeDisplay = document.getElementById('currentModeDisplay');
+                    const simulationBtn = document.getElementById('simulationModeBtn');
+                    const realBtn = document.getElementById('realModeBtn');
+                    
+                    modeDisplay.textContent = data.currentMode;
+                    
+                    // 버튼 상태 업데이트
+                    if (data.simulationMode) {
+                        simulationBtn.classList.add('active');
+                        simulationBtn.style.backgroundColor = '#ff9800';
+                        simulationBtn.style.color = 'white';
+                        realBtn.classList.remove('active');
+                        realBtn.style.backgroundColor = '';
+                        realBtn.style.color = '';
+                        modeDisplay.style.color = '#ff9800';
+                    } else {
+                        realBtn.classList.add('active');
+                        realBtn.style.backgroundColor = '#28a745';
+                        realBtn.style.color = 'white';
+                        simulationBtn.classList.remove('active');
+                        simulationBtn.style.backgroundColor = '';
+                        simulationBtn.style.color = '';
+                        modeDisplay.style.color = '#28a745';
+                    }
+                })
+                .catch(error => {
+                    console.error('SMS 모드 로드 실패:', error);
+                    document.getElementById('currentModeDisplay').textContent = '로드 실패';
+                });
+        }
+
+        // SMS 모드 설정
+        function setSmsMode(simulationMode) {
+            const confirmMessage = simulationMode 
+                ? '시뮬레이션 모드로 변경하시겠습니까?\n(실제 SMS 발송 없이 로그만 출력됩니다)'
+                : '실제 발송 모드로 변경하시겠습니까?\n(실제 SMS가 발송되어 비용이 발생합니다)';
+            
+            if (!confirm(confirmMessage)) {
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('simulationMode', simulationMode);
+
+            fetch(`${API_BASE_URL}/nurse/sms-mode`, {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.text())
+            .then(result => {
+                alert(result);
+                loadSmsMode(); // 모드 상태 새로고침
+            })
+            .catch(error => {
+                console.error('SMS 모드 설정 실패:', error);
+                alert('SMS 모드 설정 중 오류가 발생했습니다.');
+            });
+        }
+
+        // SMS 테스트 발송
+        function sendTestSms() {
+            const phoneNumber = document.getElementById('testPhoneNumber').value;
+            const message = document.getElementById('testMessage').value;
+            const resultDiv = document.getElementById('testSmsResult');
+
+            if (!phoneNumber) {
+                showTestResult('전화번호를 입력해주세요.', 'error');
+                return;
+            }
+
+            if (!message) {
+                showTestResult('메시지를 입력해주세요.', 'error');
+                return;
+            }
+
+            // 전화번호 형식 검증
+            const phoneRegex = /^01[0-9]-?\d{3,4}-?\d{4}$/;
+            if (!phoneRegex.test(phoneNumber.replace(/[^0-9]/g, ''))) {
+                showTestResult('올바른 전화번호 형식을 입력해주세요. (예: 010-1234-5678)', 'error');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('phoneNumber', phoneNumber);
+            formData.append('message', message);
+
+            showTestResult('SMS 발송 중...', 'info');
+
+            fetch(`${API_BASE_URL}/nurse/test-sms`, {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.text())
+            .then(result => {
+                if (result.includes('성공')) {
+                    showTestResult(result, 'success');
+                    document.getElementById('testPhoneNumber').value = '';
+                    document.getElementById('testMessage').value = '';
+                } else {
+                    showTestResult('SMS 발송 실패: ' + result, 'error');
+                }
+            })
+            .catch(error => {
+                console.error('SMS 테스트 발송 실패:', error);
+                showTestResult('SMS 발송 중 오류가 발생했습니다.', 'error');
+            });
+        }
+
+        // 테스트 결과 표시
+        function showTestResult(message, type) {
+            const resultDiv = document.getElementById('testSmsResult');
+            resultDiv.style.display = 'block';
+            resultDiv.textContent = message;
+            
+            // 스타일 초기화
+            resultDiv.classList.remove('success', 'error', 'info');
+            
+            switch(type) {
+                case 'success':
+                    resultDiv.style.backgroundColor = '#d4edda';
+                    resultDiv.style.color = '#155724';
+                    resultDiv.style.border = '1px solid #c3e6cb';
+                    break;
+                case 'error':
+                    resultDiv.style.backgroundColor = '#f8d7da';
+                    resultDiv.style.color = '#721c24';
+                    resultDiv.style.border = '1px solid #f5c6cb';
+                    break;
+                case 'info':
+                    resultDiv.style.backgroundColor = '#d1ecf1';
+                    resultDiv.style.color = '#0c5460';
+                    resultDiv.style.border = '1px solid #bee5eb';
+                    break;
+            }
+            
+            // 5초 후 자동 숨김
+            setTimeout(() => {
+                resultDiv.style.display = 'none';
+            }, 5000);
+        }
+
+
+
+        // 전화번호 자동 포맷팅 (SMS 테스트용)
+        document.getElementById('testPhoneNumber').addEventListener('input', function(e) {
+            let value = e.target.value.replace(/\D/g, '');
+            if (value.length >= 3 && value.length <= 7) {
+                value = value.replace(/(\d{3})(\d{1,4})/, '$1-$2');
+            } else if (value.length >= 8) {
+                value = value.replace(/(\d{3})(\d{4})(\d{1,4})/, '$1-$2-$3');
+            }
+            e.target.value = value;
+        });
+
+        // ========== 암호 확인 함수 ==========
+        
+        // 암호 확인
+        function checkPassword() {
+            const password = document.getElementById('passwordInput').value;
+            const errorDiv = document.getElementById('passwordError');
+            
+            // 간호사 페이지 암호 (실제 운영에서는 더 안전한 방법 사용)
+            const correctPassword = 'nurse123';
+            
+            if (password === correctPassword) {
+                // 암호 맞음 - 메인 컨텐츠 표시
+                document.getElementById('passwordOverlay').style.display = 'none';
+                document.querySelector('.main-content').style.display = 'block';
+                
+                // 데이터 로드 시작
+                loadData();
+            } else {
+                // 암호 틀림
+                errorDiv.textContent = '암호가 올바르지 않습니다.';
+                document.getElementById('passwordInput').value = '';
+                document.getElementById('passwordInput').focus();
+                
+                // 에러 메시지 3초 후 자동 삭제
+                setTimeout(() => {
+                    errorDiv.textContent = '';
+                }, 3000);
+            }
+        }
+        
+        // 엔터키로 암호 확인
+        document.getElementById('passwordInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                checkPassword();
+            }
+        });
+
+        // ========== EMR 기능 함수들 ==========
+        
+        // Vital Sign 관련 함수들
+        function loadConfirmedPatients() {
+            const select = document.getElementById('vitalPatientSelect');
+            
+            // 확인된 접수 목록에서 환자 정보 추출
+            fetch(`${API_BASE_URL}/nurse/confirmed`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                    return response.json();
+                })
+                .then(receptions => {
+                    console.log('확인된 접수 목록:', receptions);
+                    
+                    // 배열인지 확인
+                    if (!Array.isArray(receptions)) {
+                        console.error('응답이 배열이 아닙니다:', receptions);
+                        receptions = [];
+                    }
+                    
+                    // Vital Sign 환자 선택 (진료 전 환자들)
+                    select.innerHTML = '<option value="">환자를 선택하세요</option>';
+                    receptions.forEach(reception => {
+                        const option = document.createElement('option');
+                        option.value = reception.id; // reception ID 사용
+                        option.textContent = `${reception.patientName} (${reception.birthDate || '생년월일 미등록'})`;
+                        option.dataset.patientInfo = JSON.stringify(reception);
+                        select.appendChild(option);
+                    });
+                    
+                    console.log(`Vital Sign 환자 선택에 ${receptions.length}명 추가됨`);
+                })
+                .catch(error => {
+                    console.error('Vital Sign 환자 목록 로드 실패:', error);
+                    select.innerHTML = '<option value="">환자 목록을 불러올 수 없습니다</option>';
+                });
+        }
+        
+        // 환자 선택 시 Vital Sign 폼 표시
+        document.getElementById('vitalPatientSelect').addEventListener('change', function() {
+            const form = document.getElementById('vitalSignForm');
+            if (this.value) {
+                form.style.display = 'block';
+                // 기존 데이터 초기화
+                clearVitalForm();
+            } else {
+                form.style.display = 'none';
+            }
+        });
+        
+        // Vital Sign 저장
+        function saveVitalSigns() {
+            const patientSelect = document.getElementById('vitalPatientSelect');
+            const selectedPatient = patientSelect.value;
+            
+            if (!selectedPatient) {
+                alert('환자를 선택해주세요.');
+                return;
+            }
+            
+            // 간호사 ID 가져오기
+            // 체크된 증상들 수집
+            const symptoms = Array.from(document.querySelectorAll('input[name="symptoms"]:checked'))
+                .map(cb => cb.value);
+            
+            // 체크된 과거력 수집
+            const history = Array.from(document.querySelectorAll('input[name="history"]:checked'))
+                .map(cb => cb.value);
+            
+            const vitalData = {
+                receptionId: parseInt(selectedPatient),
+                bodyTemp: document.getElementById('bodyTemp').value ? parseFloat(document.getElementById('bodyTemp').value) : null,
+                bloodPressure: document.getElementById('bloodPressure').value || null,
+                pulse: document.getElementById('pulse').value ? parseInt(document.getElementById('pulse').value) : null,
+                symptoms: symptoms.join(', ') || null,
+                otherSymptoms: document.getElementById('otherSymptoms').value || null,
+                medicalHistory: history.join(', ') || null,
+                nurseNotes: document.getElementById('nurseNotes').value || null
+            };
+            
+            console.log('Vital Sign 저장 요청:', vitalData);
+            
+            fetch(`${API_BASE_URL}/nurse/vital-sign`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(vitalData)
+            })
+            .then(response => {
+                if (!response.ok) {
+                    return response.text().then(text => {
+                        let errorMessage = 'Vital Sign 저장 실패';
+                        try {
+                            const errorData = JSON.parse(text);
+                            errorMessage = errorData.message || errorMessage;
+                        } catch (e) {
+                            if (text) {
+                                errorMessage = text;
+                            }
+                        }
+                        throw new Error(`HTTP ${response.status}: ${errorMessage}`);
+                    });
+                }
+                return response.json();
+            })
+            .then(result => {
+                console.log('Vital Sign 저장 성공:', result);
+                alert(`Vital Sign이 저장되었습니다.\n환자: ${result.patientName}`);
+                clearVitalForm();
+                
+                // 환자 선택 초기화
+                document.getElementById('vitalPatientSelect').value = '';
+                document.getElementById('vitalSignForm').style.display = 'none';
+            })
+            .catch(error => {
+                console.error('Vital Sign 저장 실패:', error);
+                alert('Vital Sign 저장에 실패했습니다: ' + error.message);
+            });
+        }
+        
+        // Vital Sign 폼 초기화
+        function clearVitalForm() {
+            document.getElementById('bodyTemp').value = '';
+            document.getElementById('bloodPressure').value = '';
+            document.getElementById('pulse').value = '';
+            document.getElementById('otherSymptoms').value = '';
+            document.getElementById('nurseNotes').value = '';
+            
+            // 체크박스 초기화
+            document.querySelectorAll('input[name="symptoms"]').forEach(cb => cb.checked = false);
+            document.querySelectorAll('input[name="history"]').forEach(cb => cb.checked = false);
+        }
+        
+        // 대기 인원에 따라 알림 체크박스 활성/비활성 처리 함수
+        function updateManualNotifyRadios(waitingCount) {
+            const yesRadio = document.getElementById('manualNotifyYes');
+            const noRadio = document.getElementById('manualNotifyNo');
+            const notifyInfo = document.getElementById('manualNotifyInfo');
+            if (waitingCount >= 3) {
+                yesRadio.disabled = false;
+                noRadio.disabled = false;
+                notifyInfo.textContent = '';
+                // 이전 선택 유지, 없으면 '알림 받지 않기'가 아닌 상태로 둠
+            } else {
+                yesRadio.checked = false;
+                yesRadio.disabled = true;
+                noRadio.checked = true;
+                noRadio.disabled = true;
+                notifyInfo.textContent = '대기 인원이 3명 이상일 때만 SMS 알림 신청이 가능합니다.';
+            }
+        }
+
+        // 수기 접수 폼이 열릴 때 대기 인원 fetch 후 체크박스 상태 업데이트
+        function openManualRegisterForm() {
+            fetch(`${API_BASE_URL}/nurse/pending`)
+                .then(res => res.json())
+                .then(data => {
+                    // status가 'pending'인 환자만 카운트
+                    const pendingCount = Array.isArray(data) ? data.filter(r => r.status === 'pending').length : 0;
+                    updateManualNotifyRadios(pendingCount);
+                    if (pendingCount < 3) {
+                        document.getElementById('manualNotifyYes').checked = false;
+                        document.getElementById('manualNotifyNo').checked = true;
+                    }
+                    // ... 기존 폼 초기화 코드 ...
+                });
+        }
+
+        // 일반 환자 접수 폼이 열릴 때 대기 인원 fetch 후 체크박스 상태 업데이트
+        function openGeneralRegisterForm() {
+            fetch(`${API_BASE_URL}/nurse/pending`)
+                .then(res => res.json())
+                .then(data => {
+                    // status가 'pending'인 환자만 카운트
+                    const pendingCount = Array.isArray(data) ? data.filter(r => r.status === 'pending').length : 0;
+                    updateManualNotifyRadios(pendingCount);
+                    if (pendingCount < 3) {
+                        document.getElementById('manualNotifyYes').checked = false;
+                        document.getElementById('manualNotifyNo').checked = true;
+                    }
+                });
+        }
+
+
+
+        // 일반 환자 접수 폼이 열릴 때 대기 인원 fetch 후 체크박스 상태 업데이트
+        function openGeneralRegisterForm() {
+            fetch(`${API_BASE_URL}/nurse/pending`)
+                .then(res => res.json())
+                .then(data => {
+                    // status가 'pending'인 환자만 카운트
+                    const pendingCount = Array.isArray(data) ? data.filter(r => r.status === 'pending').length : 0;
+                    updateGeneralNotifyRadios(pendingCount);
+                });
+        }
+
+        // ========== SMS 관련 함수들 ==========
+
+        // SMS 알림 발송 시점 설정 로드
+        function loadNotifyTimingSettings() {
+            const savedTiming = localStorage.getItem('notifyTiming');
+            const timing = savedTiming ? parseInt(savedTiming) : 2; // 기본값 2명
+            
+            document.getElementById('notifyTiming').value = timing;
+            updateNotifyTimingDisplay(timing);
+        }
+        
+        // SMS 알림 발송 시점 설정 업데이트
+        function updateNotifyTiming() {
+            const timing = parseInt(document.getElementById('notifyTiming').value);
+            
+            if (timing < 1 || timing > 5) {
+                alert('알림 발송 시점은 1명에서 5명 사이로 설정해주세요.');
+                return;
+            }
+            
+            // 로컬 스토리지에 저장
+            localStorage.setItem('notifyTiming', timing);
+            
+            // 화면 업데이트
+            updateNotifyTimingDisplay(timing);
+            
+            alert(`SMS 알림 발송 시점이 "앞 대기자가 ${timing}명 남았을 때"로 설정되었습니다.`);
+        }
+        
+        // SMS 알림 발송 시점 표시 업데이트
+        function updateNotifyTimingDisplay(timing) {
+            document.getElementById('currentNotifyTimingDisplay').textContent = `앞 대기자가 ${timing}명 남았을 때 알림 발송`;
+        }
+
+        // JS: showExistingPatientInfo 함수 하단에 추가
+        let currentEditingPatient = null;
+        document.addEventListener('DOMContentLoaded', function() {
+            const infoDiv = document.getElementById('existingPatientInfo');
+            infoDiv.addEventListener('click', function(e) {
+                if (e.target && e.target.id === 'editPatientBtn') {
+                    startEditPatient();
+                } else if (e.target && e.target.id === 'savePatientBtn') {
+                    saveEditPatient();
+                } else if (e.target && e.target.id === 'cancelEditPatientBtn') {
+                    cancelEditPatient();
+                }
+            });
+        });
+        function startEditPatient() {
+            if (!currentSelectedPatient) return;
+            currentEditingPatient = {...currentSelectedPatient};
+            document.getElementById('existingPatientBasicInfo').style.display = 'none';
+            document.getElementById('editPatientForm').style.display = 'flex';
+            document.getElementById('editPatientName').value = currentSelectedPatient.name;
+            document.getElementById('editPatientBirth').value = currentSelectedPatient.birthDate;
+            document.getElementById('editPatientPhone').value = currentSelectedPatient.phoneNumber || '';
+        }
+        function cancelEditPatient() {
+            document.getElementById('existingPatientBasicInfo').style.display = 'flex';
+            document.getElementById('editPatientForm').style.display = 'none';
+        }
+        function saveEditPatient() {
+            const name = document.getElementById('editPatientName').value.trim();
+            const birthDate = document.getElementById('editPatientBirth').value;
+            const phoneNumber = document.getElementById('editPatientPhone').value.trim();
+            if (!name || !birthDate) {
+                alert('이름과 생년월일은 필수입니다.');
+                return;
+            }
+            fetch(`${API_BASE_URL}/nurse/patient/${currentSelectedPatient.patientId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, birthDate, phoneNumber })
+            })
+            .then(res => {
+                if (!res.ok) throw new Error('수정 실패');
+                return res.json();
+            })
+            .then(updated => {
+                showExistingPatientInfo(updated);
+                document.getElementById('existingPatientBasicInfo').style.display = 'flex';
+                document.getElementById('editPatientForm').style.display = 'none';
+                alert('환자 정보가 수정되었습니다.');
+            })
+            .catch(err => {
+                alert('수정 중 오류: ' + err.message);
+            });
+        }
+        // showExistingPatientInfo에서 currentSelectedPatient도 갱신
+        function showExistingPatientInfo(patient) {
+            currentSelectedPatient = patient;
+            document.getElementById('existingPatientName').textContent = patient.name;
+            document.getElementById('existingPatientBirth').textContent = patient.birthDate;
+            document.getElementById('existingPatientPhone').textContent = patient.phoneNumber || '전화번호 없음';
+            document.getElementById('existingVisitCount').textContent = patient.totalVisits;
+            document.getElementById('existingLastVisit').textContent = patient.lastVisit ? formatDateTime(patient.lastVisit) : '없음';
+            if (patient.latestSurvey && patient.latestSurvey.symptoms) {
+                document.getElementById('existingSymptomsText').textContent = patient.latestSurvey.symptoms;
+                document.getElementById('existingSymptoms').style.display = 'block';
+            } else {
+                document.getElementById('existingSymptoms').style.display = 'none';
+            }
+            document.getElementById('existingPatientInfo').style.display = 'block';
+            document.getElementById('existingPatientBasicInfo').style.display = 'flex';
+            document.getElementById('editPatientForm').style.display = 'none';
+        }
+    </script>
+    </div> <!-- main-content 끝 -->
+</body>
+</html> 

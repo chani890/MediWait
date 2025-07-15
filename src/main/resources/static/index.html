@@ -1,0 +1,847 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>병원 QR 접수 시스템</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <!-- WebSocket 라이브러리 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.6.1/sockjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: white;
+            min-height: 100vh;
+            padding: 2rem 0;
+            margin: 0;
+        }
+
+        .container {
+            background: white;
+            padding: 2rem;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            width: 90%;
+            max-width: 500px;
+            margin: 0 auto;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .header h1 {
+            color: #333;
+            margin-bottom: 0.5rem;
+            font-size: 1.8rem;
+        }
+
+        .header p {
+            color: #666;
+            font-size: 0.9rem;
+        }
+
+        .qr-welcome {
+            background: #f0fdf4;
+            border: 1px solid #bbf7d0;
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1.5rem;
+            text-align: center;
+        }
+
+        .qr-welcome i {
+            color: #10b981;
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .qr-welcome h3 {
+            color: #10b981;
+            margin-bottom: 0.5rem;
+            font-size: 1.1rem;
+        }
+
+        .qr-welcome p {
+            color: #374151;
+            font-size: 0.9rem;
+            margin: 0;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: #333;
+            font-weight: 500;
+        }
+
+        input, select, textarea {
+            width: 100%;
+            padding: 0.8rem;
+            border: 2px solid #e1e5e9;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: border-color 0.3s;
+        }
+
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .guardian-section {
+            margin-bottom: 1.5rem;
+        }
+
+        .guardian-section > label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .radio-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.7rem;
+            margin-top: 0.8rem;
+        }
+
+        .radio-item {
+            display: flex;
+            align-items: center;
+            padding: 0.5rem 0.8rem;
+            background: white;
+            border-radius: 6px;
+            border: 2px solid #e9ecef;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .radio-item:hover {
+            border-color: #667eea;
+            background: #f8f9ff;
+        }
+
+        .radio-item input[type="radio"] {
+            margin: 0;
+            margin-right: 0.6rem;
+            width: 16px;
+            height: 16px;
+            accent-color: #667eea;
+        }
+
+        .radio-item label {
+            margin: 0;
+            padding: 0;
+            color: #333;
+            font-weight: 500;
+            cursor: pointer;
+            flex: 1;
+        }
+
+        .radio-item input[type="radio"]:checked + label {
+            color: #667eea;
+            font-weight: 600;
+        }
+
+        .radio-item:has(input[type="radio"]:checked) {
+            border-color: #667eea;
+            background: #f8f9ff;
+            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.15);
+        }
+
+        .survey-section {
+            background: #fff3cd;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1.5rem;
+            border: 1px solid #ffeaa7;
+        }
+
+        .survey-section h3 {
+            color: #856404;
+            margin-bottom: 1rem;
+            font-size: 1.1rem;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 1rem;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .waiting-info {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1.5rem;
+            text-align: center;
+        }
+
+        .error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1.5rem;
+        }
+
+        .success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1.5rem;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 2rem;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1rem;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .date-input-group {
+            position: relative;
+        }
+
+        .quick-date-buttons {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            padding: 0.5rem;
+            z-index: 10;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+
+        .btn-quick-date {
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 4px;
+            background: #f8f9fa;
+            color: #495057;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: all 0.3s;
+            flex: 1;
+            min-width: 60px;
+        }
+
+        .btn-quick-date:hover {
+            background: #667eea;
+            color: white;
+        }
+
+        .date-dropdown-group {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .date-dropdown-group select {
+            flex: 1;
+            padding: 0.75rem;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 1rem;
+            background: white;
+            cursor: pointer;
+        }
+
+        .date-dropdown-group select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1><i class="fas fa-hospital"></i> 서대 병원</h1>
+        </div>
+
+        <div class="qr-welcome">
+            <i class="fas fa-qrcode"></i>
+            <h3>QR 코드 접수</h3>
+        </div>
+
+        <div id="waitingInfo" class="waiting-info">
+            현재 대기 인원: <span id="waitingCount">-</span>명
+        </div>
+
+        <form id="receptionForm">
+            <div class="form-group">
+                <label for="name">이름 *</label>
+                <input type="text" id="name" name="name" required>
+            </div>
+
+            <div class="form-group">
+                <label for="birthDate">생년월일 *</label>
+                <div class="date-dropdown-group">
+                    <select id="birthYear" name="birthYear" required>
+                        <option value="">년도</option>
+                    </select>
+                    <select id="birthMonth" name="birthMonth" required>
+                        <option value="">월</option>
+                        <option value="01">1월</option>
+                        <option value="02">2월</option>
+                        <option value="03">3월</option>
+                        <option value="04">4월</option>
+                        <option value="05">5월</option>
+                        <option value="06">6월</option>
+                        <option value="07">7월</option>
+                        <option value="08">8월</option>
+                        <option value="09">9월</option>
+                        <option value="10">10월</option>
+                        <option value="11">11월</option>
+                        <option value="12">12월</option>
+                    </select>
+                    <select id="birthDay" name="birthDay" required>
+                        <option value="">일</option>
+                    </select>
+                    <input type="hidden" id="birthDate" name="birthDate" required>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="phoneNumber">전화번호 *</label>
+                <input type="tel" id="phoneNumber" name="phoneNumber" placeholder="010-1234-5678" required>
+                        </div>
+
+            <div class="guardian-section">
+                <label>접수자 구분 *</label>
+                <div class="radio-group">
+                    <div class="radio-item">
+                        <input type="radio" id="self" name="isGuardian" value="false" required>
+                        <label for="self">본인</label>
+                    </div>
+                    <div class="radio-item">
+                        <input type="radio" id="guardian" name="isGuardian" value="true" required>
+                        <label for="guardian">보호자</label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>SMS 알림 설정</label>
+                <div id="smsNotificationSection">
+                    <div class="radio-group">
+                        <div class="radio-item">
+                            <input type="radio" id="notifyEnabled" name="notifyEnabled" value="true">
+                            <label for="notifyEnabled">SMS 알림 받기</label>
+                        </div>
+                        <div class="radio-item">
+                            <input type="radio" id="notifyDisabled" name="notifyEnabled" value="false" checked>
+                            <label for="notifyDisabled">SMS 알림 받지 않기</label>
+                        </div>
+                    </div>
+                    <div id="notifyAtSection" style="margin-top: 1rem; display: none;">
+                        <label for="notifyAt">몇 명 남았을 때 알림을 받으시겠습니까?</label>
+                        <select id="notifyAt" name="notifyAt" style="width: 100%; padding: 0.5rem; margin-top: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
+                            <option value="2">2명 남았을 때</option>
+                            <option value="3">3명 남았을 때</option>
+                            <option value="4">4명 남았을 때</option>
+                            <option value="5">5명 남았을 때</option>
+                        </select>
+                    </div>
+                    <div id="smsNotAvailable" style="display: none; color: #888; font-size: 0.9rem; margin-top: 0.5rem;">
+                        현재 대기 인원이 3명 미만이므로 SMS 알림을 받을 수 없습니다.
+                    </div>
+                </div>
+            </div>
+
+
+
+            <div id="surveySection" class="survey-section hidden">
+                <h3><i class="fas fa-clipboard-list"></i> 문진표 (신규 환자)</h3>
+                
+                <div class="form-group">
+                    <label for="visitReason">내원 사유</label>
+                    <input type="text" id="visitReason" name="visitReason" placeholder="예: 감기 증상, 건강검진 등">
+                </div>
+
+                <div class="form-group">
+                    <label for="symptoms">현재 증상</label>
+                    <textarea id="symptoms" name="symptoms" rows="3" placeholder="현재 느끼는 증상을 자세히 적어주세요"></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label for="allergies">알레르기</label>
+                    <input type="text" id="allergies" name="allergies" placeholder="약물, 음식 알레르기 등">
+                </div>
+
+                <div class="form-group">
+                    <label for="medications">복용 중인 약물</label>
+                    <input type="text" id="medications" name="medications" placeholder="현재 복용 중인 약물이 있다면 적어주세요">
+                </div>
+
+                <div class="form-group">
+                    <label for="medicalHistory">과거 병력</label>
+                    <textarea id="medicalHistory" name="medicalHistory" rows="2" placeholder="과거에 앓았던 질병이나 수술 이력"></textarea>
+                </div>
+            </div>
+
+            <button type="submit" class="btn" id="submitBtn">접수하기</button>
+        </form>
+
+        <div id="result" class="hidden"></div>
+        <div id="loading" class="loading hidden">
+            <div class="spinner"></div>
+            <p>접수 처리 중...</p>
+        </div>
+    </div>
+
+    <script>
+        // API URL을 동적으로 설정 (휴대폰 접속 시 네트워크 IP 사용)
+        function getApiBaseUrl() {
+            const hostname = window.location.hostname;
+            const port = '8081';
+            
+            if (hostname === 'localhost' || hostname === '127.0.0.1') {
+                // localhost 접속 시 실제 네트워크 IP 사용
+                return 'http://192.168.70.26:8081/api';
+            } else {
+                // 실제 호스트명으로 접속 시 그대로 사용
+                return `http://${hostname}:${port}/api`;
+            }
+        }
+        
+        const API_BASE_URL = getApiBaseUrl();
+        let isNewPatient = false;
+
+        // WebSocket 연결 설정
+        let stompClient = null;
+        let isConnected = false;
+
+        function connectWebSocket() {
+            const socket = new SockJS(`${API_BASE_URL.replace('/api', '')}/ws`);
+            stompClient = Stomp.over(socket);
+            
+            stompClient.connect({}, function(frame) {
+                console.log('WebSocket 연결 성공:', frame);
+                isConnected = true;
+                
+                // 대기열 업데이트 구독
+                stompClient.subscribe('/topic/waiting-queue', function(message) {
+                    const data = JSON.parse(message.body);
+                    console.log('대기열 업데이트 수신:', data);
+                    
+                    if (data.type === 'QUEUE_UPDATE') {
+                        // 대기 인원 자동 업데이트
+                        updateWaitingCount();
+                    }
+                });
+                
+            }, function(error) {
+                console.error('WebSocket 연결 실패:', error);
+                isConnected = false;
+                
+                // 재연결 시도
+                setTimeout(() => {
+                    console.log('WebSocket 재연결 시도...');
+                    connectWebSocket();
+                }, 5000);
+            });
+        }
+
+        // 페이지 로드 시 대기 인원 조회
+        document.addEventListener('DOMContentLoaded', function() {
+            updateWaitingCount();
+            initializeDateDropdowns();
+            
+            // WebSocket 연결
+            connectWebSocket();
+            
+            // 환자 정보 입력 시 기존 환자 확인
+            const nameInput = document.getElementById('name');
+            const phoneInput = document.getElementById('phoneNumber');
+            
+            [nameInput, phoneInput].forEach(input => {
+                input.addEventListener('blur', checkExistingPatient);
+            });
+            
+            // SMS 알림 라디오 버튼 이벤트 리스너
+            document.getElementById('notifyEnabled').addEventListener('change', function() {
+                const notifyAtSection = document.getElementById('notifyAtSection');
+                if (this.checked) {
+                    notifyAtSection.style.display = 'block';
+                } else {
+                    notifyAtSection.style.display = 'none';
+                }
+            });
+            
+            document.getElementById('notifyDisabled').addEventListener('change', function() {
+                const notifyAtSection = document.getElementById('notifyAtSection');
+                if (this.checked) {
+                    notifyAtSection.style.display = 'none';
+                }
+            });
+            
+            // 폴백: 30초마다 대기 인원 업데이트 (WebSocket 연결 실패 시)
+            setInterval(() => {
+                if (!isConnected) {
+                    updateWaitingCount();
+                }
+            }, 30000);
+        });
+
+        // 대기 인원 업데이트
+        function updateWaitingCount() {
+            fetch(`${API_BASE_URL}/patient/waiting-count`)
+                .then(response => response.json())
+                .then(count => {
+                    document.getElementById('waitingCount').textContent = count;
+                    updateSmsNotificationOptions(count);
+                })
+                .catch(error => {
+                    console.error('대기 인원 조회 실패:', error);
+                    document.getElementById('waitingCount').textContent = '-';
+                });
+        }
+
+        // SMS 알림 옵션 업데이트 (현재 대기 인원에 따라)
+        function updateSmsNotificationOptions(waitingCount) {
+            const notifyEnabledRadio = document.getElementById('notifyEnabled');
+            const notifyDisabledRadio = document.getElementById('notifyDisabled');
+            const notifyAtSection = document.getElementById('notifyAtSection');
+            const smsNotAvailable = document.getElementById('smsNotAvailable');
+            
+            if (waitingCount >= 3) {
+                // 3명 이상일 때: 알림 받기 선택 가능
+                notifyEnabledRadio.disabled = false;
+                notifyDisabledRadio.disabled = false;
+                smsNotAvailable.style.display = 'none';
+                
+                // 알림 받기 선택 시 notifyAt 섹션 표시
+                if (notifyEnabledRadio.checked) {
+                    notifyAtSection.style.display = 'block';
+                }
+            } else {
+                // 3명 미만일 때: 알림 받지 않기로 강제 설정
+                notifyEnabledRadio.disabled = true;
+                notifyDisabledRadio.disabled = true;
+                notifyDisabledRadio.checked = true;
+                notifyAtSection.style.display = 'none';
+                smsNotAvailable.style.display = 'block';
+            }
+            
+            // notifyAt 옵션 업데이트
+            const notifySelect = document.getElementById('notifyAt');
+            const options = notifySelect.querySelectorAll('option');
+            
+            options.forEach(option => {
+                const notifyValue = parseInt(option.value);
+                if (notifyValue > waitingCount) {
+                    option.disabled = true;
+                    option.textContent = option.textContent.replace(' (설정 불가)', '') + ' (설정 불가)';
+                } else {
+                    option.disabled = false;
+                    option.textContent = option.textContent.replace(' (설정 불가)', '');
+                }
+            });
+        }
+
+        // 기존 환자 확인 (실제로는 서버에서 확인해야 함)
+        function checkExistingPatient() {
+            const name = document.getElementById('name').value;
+            const birthDate = document.getElementById('birthDate').value;
+            const phoneNumber = document.getElementById('phoneNumber').value;
+            
+            if (name && birthDate && phoneNumber) {
+                // 실제 구현에서는 서버 API 호출
+                // 여기서는 임시로 신규 환자로 처리
+                showSurveySection();
+            }
+        }
+
+        // 문진표 섹션 표시
+        function showSurveySection() {
+            document.getElementById('surveySection').classList.remove('hidden');
+            isNewPatient = true;
+        }
+
+        // 문진표 섹션 숨김
+        function hideSurveySection() {
+            document.getElementById('surveySection').classList.add('hidden');
+            isNewPatient = false;
+        }
+
+
+
+        // 폼 제출 처리
+        document.getElementById('receptionForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(this);
+            const data = {
+                name: formData.get('name'),
+                birthDate: formData.get('birthDate'),
+                phoneNumber: formData.get('phoneNumber'),
+                isGuardian: formData.get('isGuardian') === 'true',
+                notifyEnabled: formData.get('notifyEnabled') === 'true',
+                notifyAt: formData.get('notifyEnabled') === 'true' ? parseInt(formData.get('notifyAt')) : null,
+                symptoms: formData.get('symptoms') || null,
+                allergies: formData.get('allergies') || null,
+                medications: formData.get('medications') || null,
+                medicalHistory: formData.get('medicalHistory') || null,
+                visitReason: formData.get('visitReason') || null
+            };
+
+            submitReception(data);
+        });
+
+        // 접수 제출
+        function submitReception(data) {
+            showLoading();
+            
+            console.log('API 호출:', API_BASE_URL + '/patient/register');
+            console.log('전송 데이터:', data);
+            
+            fetch(`${API_BASE_URL}/patient/register`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(data)
+            })
+            .then(response => {
+                console.log('응답 상태:', response.status);
+                if (!response.ok) {
+                    return response.text().then(text => {
+                        let errorMessage = '접수 처리 중 오류가 발생했습니다.';
+                        try {
+                            const errorData = JSON.parse(text);
+                            errorMessage = errorData.message || errorMessage;
+                        } catch (e) {
+                            if (text) {
+                                errorMessage = text;
+                            }
+                        }
+                        throw new Error(`HTTP ${response.status}: ${errorMessage}`);
+                    });
+                }
+                return response.json();
+            })
+            .then(result => {
+                console.log('접수 성공:', result);
+                hideLoading();
+                showSuccess(result);
+                updateWaitingCount();
+            })
+            .catch(error => {
+                console.error('접수 실패:', error);
+                hideLoading();
+                showError(error.message);
+            });
+        }
+
+        // 로딩 표시
+        function showLoading() {
+            document.getElementById('loading').classList.remove('hidden');
+            document.getElementById('receptionForm').classList.add('hidden');
+        }
+
+        // 로딩 숨김
+        function hideLoading() {
+            document.getElementById('loading').classList.add('hidden');
+            document.getElementById('receptionForm').classList.remove('hidden');
+        }
+
+        // 성공 메시지 표시
+        function showSuccess(result) {
+            const resultDiv = document.getElementById('result');
+            resultDiv.className = 'success';
+            resultDiv.innerHTML = `
+                <h3><i class="fas fa-check-circle"></i> 접수가 완료되었습니다!</h3>
+                <p><strong>접수 번호:</strong> ${result.id}</p>
+                <p><strong>환자명:</strong> ${result.patientName}</p>
+                <p><strong>현재 대기 순번:</strong> ${result.waitingPosition}번</p>
+                <p><strong>상태:</strong> ${getStatusText(result.status)}</p>
+                ${result.isNewPatient ? '<p><i class="fas fa-clipboard-check"></i> 문진표가 저장되었습니다.</p>' : ''}
+                <p style="margin-top: 1rem; font-size: 0.9rem; color: #666;">
+                    간호사가 신분증을 확인한 후 대기열에 등록됩니다.
+                </p>
+                <div style="margin-top: 1rem; padding: 15px; background: #f8f9fa; border-radius: 8px; border-left: 4px solid #667eea;">
+                    <p style="margin: 0; font-size: 0.9rem; color: #333;">
+                        <strong><i class="fas fa-mobile-alt"></i> 실시간 대기 현황 확인:</strong><br>
+                        <a href="/my-waiting.html?id=${result.id}" target="_blank" style="color: #667eea; text-decoration: none;">
+                            여기를 클릭하여 개인 대기 현황 페이지로 이동
+                        </a>
+                    </p>
+                </div>
+            `;
+            resultDiv.classList.remove('hidden');
+            
+            // 폼 숨김
+            document.getElementById('receptionForm').classList.add('hidden');
+        }
+
+        // 에러 메시지 표시
+        function showError(message) {
+            const resultDiv = document.getElementById('result');
+            resultDiv.className = 'error';
+            resultDiv.innerHTML = `
+                <h3><i class="fas fa-times-circle"></i> 접수 실패</h3>
+                <p>${message}</p>
+                <button onclick="location.reload()" class="btn" style="margin-top: 1rem;">다시 시도</button>
+            `;
+            resultDiv.classList.remove('hidden');
+        }
+
+        // 상태 텍스트 변환
+        function getStatusText(status) {
+            const statusMap = {
+                'PENDING': '대기 중',
+                'CONFIRMED': '확인됨',
+                'CALLED': '호출됨',
+                'DONE': '완료',
+                'NO_RESPONSE': '미응답',
+                'CANCELED': '취소됨'
+            };
+            return statusMap[status] || status;
+        }
+
+        // 전화번호 자동 포맷팅
+        document.getElementById('phoneNumber').addEventListener('input', function(e) {
+            let value = e.target.value.replace(/\D/g, '');
+            if (value.length >= 3 && value.length <= 7) {
+                value = value.replace(/(\d{3})(\d{1,4})/, '$1-$2');
+            } else if (value.length >= 8) {
+                value = value.replace(/(\d{3})(\d{4})(\d{1,4})/, '$1-$2-$3');
+            }
+            e.target.value = value;
+        });
+
+        // 생년월일 드롭다운 초기화
+        function initializeDateDropdowns() {
+            const currentYear = new Date().getFullYear();
+            const birthYearSelect = document.getElementById('birthYear');
+            
+            // 년도 옵션 생성 (현재 년도부터 100년 전까지)
+            for (let year = currentYear; year >= currentYear - 100; year--) {
+                const option = document.createElement('option');
+                option.value = year;
+                option.textContent = year + '년';
+                birthYearSelect.appendChild(option);
+            }
+            
+            // 일 옵션 생성
+            updateDayOptions();
+        }
+
+        // 월 변경 시 일 옵션 업데이트
+        function updateDayOptions() {
+            const year = document.getElementById('birthYear').value;
+            const month = document.getElementById('birthMonth').value;
+            const daySelect = document.getElementById('birthDay');
+            
+            // 기존 옵션 제거
+            daySelect.innerHTML = '<option value="">일</option>';
+            
+            if (year && month) {
+                const daysInMonth = new Date(year, month, 0).getDate();
+                for (let day = 1; day <= daysInMonth; day++) {
+                    const option = document.createElement('option');
+                    const dayStr = day.toString().padStart(2, '0');
+                    option.value = dayStr;
+                    option.textContent = day + '일';
+                    daySelect.appendChild(option);
+                }
+            }
+        }
+
+        // 생년월일 조합하여 hidden input에 설정
+        function updateBirthDate() {
+            const year = document.getElementById('birthYear').value;
+            const month = document.getElementById('birthMonth').value;
+            const day = document.getElementById('birthDay').value;
+            
+            if (year && month && day) {
+                const birthDate = `${year}-${month}-${day}`;
+                document.getElementById('birthDate').value = birthDate;
+            } else {
+                document.getElementById('birthDate').value = '';
+            }
+        }
+
+        // 드롭다운 변경 이벤트 리스너
+        document.getElementById('birthYear').addEventListener('change', function() {
+            updateDayOptions();
+            updateBirthDate();
+        });
+
+        document.getElementById('birthMonth').addEventListener('change', function() {
+            updateDayOptions();
+            updateBirthDate();
+        });
+
+        document.getElementById('birthDay').addEventListener('change', updateBirthDate);
+
+        // 정기적으로 대기 인원 업데이트
+        setInterval(updateWaitingCount, 30000); // 30초마다 업데이트
+    </script>
+</body>
+</html> 

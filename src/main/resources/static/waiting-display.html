@@ -1,0 +1,950 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>대기열 현황 - 병원 접수 시스템</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
+    <!-- WebSocket 라이브러리 -->
+    <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/stompjs@2.3.3/lib/stomp.min.js"></script>
+    <style>
+        :root {
+            --primary-color: #2563eb;
+            --success-color: #059669;
+            --warning-color: #d97706;
+            --danger-color: #dc2626;
+            --gray-50: #f9fafb;
+            --gray-100: #f3f4f6;
+            --gray-200: #e5e7eb;
+            --gray-600: #4b5563;
+            --gray-800: #1f2937;
+            --gray-900: #111827;
+            --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: #f8fafc;
+            color: #1f2937;
+            overflow-y: auto;
+            min-height: 100vh;
+        }
+
+        /* Header */
+        .header {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            padding: 1.5rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid rgba(255, 255, 255, 0.2);
+            color: white;
+        }
+
+        .hospital-info h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+
+        .hospital-info p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .current-time-display {
+            text-align: right;
+        }
+
+        .time {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 0.25rem;
+        }
+
+        .date {
+            font-size: 1.2rem;
+            opacity: 0.9;
+        }
+
+        /* Main Content */
+        .main-content {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 2rem;
+            padding: 2rem;
+            min-height: calc(100vh - 120px);
+        }
+
+        /* Left Side - Queue */
+        .queue-section {
+            background: white;
+            border-radius: 20px;
+            padding: 2rem;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+            border: 1px solid #e5e7eb;
+        }
+
+        .section-title {
+            font-size: 1.8rem;
+            font-weight: 700;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .section-title i {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            padding: 0.75rem;
+            border-radius: 12px;
+            font-size: 1.2rem;
+        }
+
+        /* Current Call */
+        .current-call {
+            background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+            border-radius: 16px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            text-align: center;
+            box-shadow: var(--shadow-lg);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.02); }
+            100% { transform: scale(1); }
+        }
+
+        .current-call h3 {
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+            opacity: 0.9;
+        }
+
+        .current-patient {
+            font-size: 3rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+
+        .room-info {
+            font-size: 1.3rem;
+            opacity: 0.9;
+        }
+
+        /* Waiting Queue */
+        .waiting-queue {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .queue-item {
+            background: #f9fafb;
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border: 1px solid #e5e7eb;
+            transition: all 0.3s ease;
+        }
+
+        .queue-item:hover {
+            background: #f0fdf4;
+            transform: translateX(5px);
+            border-color: #10b981;
+        }
+
+        .queue-number {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+
+        .patient-info {
+            flex: 1;
+            margin-left: 1.5rem;
+        }
+
+        .patient-name {
+            font-size: 1.3rem;
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+        }
+
+        .patient-time {
+            opacity: 0.8;
+            font-size: 1rem;
+        }
+
+        .status-indicator {
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+
+        .status-waiting {
+            background: #fef3c7;
+            border: 1px solid #f59e0b;
+            color: #92400e;
+        }
+
+        .status-confirmed {
+            background: #d1fae5;
+            border: 1px solid #10b981;
+            color: #065f46;
+        }
+
+        /* Right Side - Info */
+        .info-section {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .info-card {
+            background: white;
+            border-radius: 16px;
+            padding: 1.5rem;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+            border: 1px solid #e5e7eb;
+        }
+
+        .info-card h3 {
+            font-size: 1.3rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        /* Statistics */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+
+        .stat-item {
+            text-align: center;
+            padding: 1rem;
+            background: #f0fdf4;
+            border-radius: 12px;
+            border: 1px solid #10b981;
+        }
+
+        .stat-number {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 0.25rem;
+            color: #059669;
+        }
+
+        .stat-label {
+            font-size: 0.9rem;
+            opacity: 0.8;
+        }
+
+        /* Announcements */
+        .announcements {
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .announcement-item {
+            background: #f9fafb;
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 0.75rem;
+            border-left: 4px solid #10b981;
+        }
+
+        .announcement-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .announcement-title {
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+        }
+
+        .announcement-content {
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+
+
+
+        /* No Data States */
+        .no-data {
+            text-align: center;
+            padding: 2rem;
+            opacity: 0.7;
+        }
+
+        .no-data i {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            opacity: 0.5;
+        }
+
+        /* Responsive */
+        @media (max-width: 1200px) {
+            .main-content {
+                grid-template-columns: 1fr;
+                gap: 1.5rem;
+            }
+            
+            .header {
+                flex-direction: column;
+                gap: 1rem;
+                text-align: center;
+            }
+        }
+
+        /* Scrollbar Styling */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #f3f4f6;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #10b981;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #059669;
+        }
+
+        /* Animations */
+        .fade-in {
+            animation: fadeIn 0.5s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* QR Code Styles */
+        .qr-container {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 1000;
+            background: white;
+            border-radius: 16px;
+            padding: 20px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+            text-align: center;
+            border: 2px solid #10b981;
+            animation: qrPulse 3s infinite;
+        }
+
+        .qr-container h3 {
+            color: #10b981;
+            margin-bottom: 10px;
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+
+        .qr-container p {
+            color: #6b7280;
+            font-size: 0.9rem;
+            margin-bottom: 15px;
+        }
+
+        .qr-container img {
+            width: 150px;
+            height: 150px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+        }
+
+        .qr-instructions {
+            color: #374151;
+            font-size: 0.8rem;
+            line-height: 1.4;
+        }
+
+        @keyframes qrPulse {
+            0% { transform: scale(1); box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15); }
+            50% { transform: scale(1.05); box-shadow: 0 15px 35px rgba(16, 185, 129, 0.3); }
+            100% { transform: scale(1); box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15); }
+        }
+
+        @media (max-width: 768px) {
+            .qr-container {
+                bottom: 10px;
+                right: 10px;
+                padding: 15px;
+            }
+            
+            .qr-container img {
+                width: 120px;
+                height: 120px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="hospital-info">
+            <h1><i class="fas fa-hospital"></i> 서대 병원</h1>
+        </div>
+        <div class="current-time-display">
+            <div class="time" id="currentTime">00:00:00</div>
+            <div class="date" id="currentDate">0000년 00월 00일</div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        <!-- Left Side - Queue -->
+        <div class="queue-section">
+            <h2 class="section-title">
+                <i class="fas fa-users"></i>
+                대기열 현황
+            </h2>
+
+            <!-- Current Call -->
+            <div id="currentCall" class="current-call" style="display: none;">
+                <h3><i class="fas fa-bullhorn"></i> 현재 호출</h3>
+                <div class="current-patient" id="currentPatientName">-</div>
+                <div class="room-info" id="currentRoomInfo">진료실로 입장해 주세요</div>
+            </div>
+
+            <!-- Waiting Queue -->
+            <div class="waiting-queue" id="waitingQueue">
+                <!-- Queue items will be populated here -->
+            </div>
+        </div>
+
+        <!-- Right Side - Info -->
+        <div class="info-section">
+            <!-- Statistics -->
+            <div class="info-card">
+                <h3><i class="fas fa-chart-bar"></i> 오늘 현황</h3>
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <div class="stat-number" id="waitingCount">0</div>
+                        <div class="stat-label">대기 중</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-number" id="avgWaitTime">0분</div>
+                        <div class="stat-label">평균 대기시간</div>
+                    </div>
+                </div>
+            </div>
+
+
+
+            <!-- Announcements -->
+            <div class="info-card">
+                <h3><i class="fas fa-bullhorn"></i> 공지사항</h3>
+                <div class="announcements" id="announcements">
+                    <div class="announcement-item">
+                        <div class="announcement-title">진료 시간 안내</div>
+                        <div class="announcement-content">평일 09:00 - 18:00, 점심시간 12:00 - 13:00</div>
+                    </div>
+                    <div class="announcement-item">
+                        <div class="announcement-title">마스크 착용</div>
+                        <div class="announcement-content">원활한 진료를 위해 마스크 착용을 부탁드립니다</div>
+                    </div>
+                    <div class="announcement-item">
+                        <div class="announcement-title">대기 시간 안내</div>
+                        <div class="announcement-content">현재 평균 대기시간은 약 15분입니다</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- QR Code Info + QR 접수 통합 (QR 아이콘 제거, QR코드 이미지는 남김) -->
+            <div class="info-card">
+                <h3><i class="fas fa-qrcode"></i> QR 접수 안내</h3>
+                <div style="text-align: center; padding: 1rem;">
+                    <div style="margin: 1.5rem 0;">
+                        <img id="qr-code" alt="QR Code for Patient Registration" style="width: 140px; height: 140px; display: block; margin: 0 auto;" />
+                    </div>
+                    <div class="qr-instructions" style="font-size: 0.95rem; color: #555; margin-bottom: 0.5rem;">
+                        카메라 앱으로 QR코드를 스캔하여<br>간편하게 접수하세요
+                    </div>
+                    <div style="margin-top: 0.5rem; font-size: 0.9rem; opacity: 0.8;">
+                        <a href="http://localhost:8081" style="color: #10b981; text-decoration: underline;">
+                            http://localhost:8081
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let currentCalledPatient = null;
+        let waitingList = [];
+        let callMessageTimer = null; // 호출 메시지 타이머
+
+        // Initialize the display
+        document.addEventListener('DOMContentLoaded', function() {
+            updateDateTime();
+            setInterval(updateDateTime, 1000);
+            
+            loadWaitingData();
+            setInterval(loadWaitingData, 3000); // Refresh every 3 seconds
+            
+            // Initialize QR Code
+            generateQRCode();
+        });
+
+        // Update current date and time
+        function updateDateTime() {
+            const now = new Date();
+            
+            const timeString = now.toLocaleTimeString('ko-KR', {
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+            
+            const dateString = now.toLocaleDateString('ko-KR', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                weekday: 'long'
+            });
+            
+            document.getElementById('currentTime').textContent = timeString;
+            document.getElementById('currentDate').textContent = dateString;
+        }
+
+        // Load waiting data from API
+        async function loadWaitingData() {
+            try {
+                const [pendingResponse, confirmedResponse, calledResponse, statsResponse] = await Promise.all([
+                    fetch('/api/nurse/pending'),
+                    fetch('/api/nurse/confirmed'),
+                    fetch('/api/doctor/current-patients'),
+                    fetch('/api/statistics/today').catch(() => ({ json: () => ({}) })) // Graceful fallback
+                ]);
+
+                const pendingData = await pendingResponse.json();
+                const confirmedData = await confirmedResponse.json();
+                const calledData = await calledResponse.json();
+                
+                // 안전성 검사 - 배열인지 확인
+                const pendingReceptions = Array.isArray(pendingData) ? pendingData : [];
+                const confirmedReceptions = Array.isArray(confirmedData) ? confirmedData : [];
+                const calledPatients = Array.isArray(calledData) ? calledData : [];
+                
+                let stats = {};
+                
+                try {
+                    stats = await statsResponse.json();
+                } catch (e) {
+                    // Use default stats if API not available
+                    stats = {
+                        totalReceptions: pendingReceptions.length + confirmedReceptions.length,
+                        completedReceptions: Math.floor((pendingReceptions.length + confirmedReceptions.length) * 0.7),
+                        averageWaitTime: 15
+                    };
+                }
+
+                // Update waiting queue (exclude called patients)
+                const allReceptions = confirmedReceptions.concat(pendingReceptions);
+                updateWaitingQueue(allReceptions, calledPatients);
+                
+                // Update statistics
+                updateStatistics(stats, pendingReceptions.length + confirmedReceptions.length, pendingReceptions.length + confirmedReceptions.length);
+                
+                // Check for currently called patient
+                checkCurrentCall(calledPatients);
+                
+            } catch (error) {
+                console.error('데이터 로드 실패:', error);
+                showNoDataMessage();
+            }
+        }
+
+        // Update waiting queue display
+        function updateWaitingQueue(receptions, calledPatients = []) {
+            const queueContainer = document.getElementById('waitingQueue');
+            
+            // 안전성 검사
+            if (!Array.isArray(receptions)) {
+                console.error('receptions is not an array:', receptions);
+                queueContainer.innerHTML = `
+                    <div class="no-data">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <h3>데이터 형식 오류</h3>
+                        <p>서버에서 잘못된 형식의 데이터를 받았습니다</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            if (!Array.isArray(calledPatients)) {
+                console.error('calledPatients is not an array:', calledPatients);
+                calledPatients = [];
+            }
+            
+            // Get called patient IDs to exclude from waiting list
+            const calledPatientIds = calledPatients.map(p => p && p.currentReceptionId).filter(id => id);
+            
+            // Filter out called patients
+            const waitingReceptions = receptions.filter(r => r && r.id && !calledPatientIds.includes(r.id));
+            
+            if (waitingReceptions.length === 0) {
+                queueContainer.innerHTML = `
+                    <div class="no-data">
+                        <i class="fas fa-coffee"></i>
+                        <h3>현재 대기 중인 환자가 없습니다</h3>
+                        <p>QR코드를 스캔하여 접수해 주세요</p>
+                    </div>
+                `;
+                return;
+            }
+
+            // Sort by creation time and add queue numbers
+            const sortedReceptions = waitingReceptions
+                .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))
+                .map((reception, index) => {
+                    const receptionWithQueue = Object.assign({}, reception);
+                    receptionWithQueue.queueNumber = index + 1;
+                    return receptionWithQueue;
+                });
+
+            waitingList = sortedReceptions;
+
+            queueContainer.innerHTML = sortedReceptions.map(reception => `
+                <div class="queue-item">
+                    <div class="queue-number">${reception.queueNumber}</div>
+                    <div class="patient-info">
+                        <div class="patient-name">${reception.patientName}</div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Update statistics
+        function updateStatistics(stats, totalToday, waitingCount) {
+            document.getElementById('waitingCount').textContent = waitingCount;
+            
+            // 간호사 페이지에서 설정한 대기시간 계산
+            const timePerPerson = parseInt(localStorage.getItem('waitingTimePerPerson') || '3');
+            const calculatedWaitTime = waitingCount * timePerPerson;
+            
+            document.getElementById('avgWaitTime').textContent = calculatedWaitTime + '분';
+        }
+
+        // Check for currently called patient
+        function checkCurrentCall(calledPatients) {
+            try {
+                // 안전성 검사
+                if (!Array.isArray(calledPatients)) {
+                    console.error('calledPatients is not an array:', calledPatients);
+                    hideCurrentCall();
+                    return;
+                }
+                
+                if (calledPatients && calledPatients.length > 0) {
+                    // Show the most recently called patient
+                    const mostRecentCall = calledPatients[calledPatients.length - 1];
+                    if (mostRecentCall && mostRecentCall.name) {
+                        showCurrentCall(mostRecentCall.name);
+                    } else {
+                        hideCurrentCall();
+                    }
+                } else {
+                    // No patients currently called
+                    hideCurrentCall();
+                }
+            } catch (error) {
+                console.error('현재 호출 확인 실패:', error);
+                hideCurrentCall();
+            }
+        }
+
+        // Show current call
+        function showCurrentCall(patientName) {
+            if (currentCalledPatient === patientName) return;
+            
+            // 기존 타이머가 있으면 제거
+            if (callMessageTimer) {
+                clearTimeout(callMessageTimer);
+            }
+            
+            currentCalledPatient = patientName;
+            const currentCallDiv = document.getElementById('currentCall');
+            const patientNameDiv = document.getElementById('currentPatientName');
+            
+            // 초기 메시지 표시
+            patientNameDiv.innerHTML = `<strong>${patientName}</strong>님 진료실로 들어와주세요`;
+            currentCallDiv.style.display = 'block';
+            currentCallDiv.classList.add('fade-in');
+            
+            // Play call sound (if available)
+            playCallSound();
+            
+            // 카운트다운 표시 (3초 후부터 시작)
+            let countdown = 5;
+            const countdownInterval = setInterval(() => {
+                countdown--;
+                if (countdown <= 2 && countdown > 0) {
+                    patientNameDiv.innerHTML = `<strong>${patientName}</strong>님 진료실로 들어와주세요<br><small style="opacity: 0.7; font-size: 0.8em;">${countdown}초 후 메시지가 사라집니다</small>`;
+                } else if (countdown <= 0) {
+                    clearInterval(countdownInterval);
+                }
+            }, 1000);
+            
+            // 5초 후에 메시지 자동 숨김
+            callMessageTimer = setTimeout(() => {
+                clearInterval(countdownInterval);
+                hideCurrentCall();
+            }, 5000);
+        }
+
+        // Hide current call
+        function hideCurrentCall() {
+            // 타이머 정리
+            if (callMessageTimer) {
+                clearTimeout(callMessageTimer);
+                callMessageTimer = null;
+            }
+            
+            currentCalledPatient = null;
+            const currentCallDiv = document.getElementById('currentCall');
+            currentCallDiv.style.display = 'none';
+        }
+
+        // Play call sound
+        function playCallSound() {
+            // This would play a notification sound in a real implementation
+            console.log('🔔 환자 호출 알림음');
+        }
+
+
+
+        // Show no data message
+        function showNoDataMessage() {
+            const queueContainer = document.getElementById('waitingQueue');
+            queueContainer.innerHTML = `
+                <div class="no-data">
+                    <i class="fas fa-wifi"></i>
+                    <h3>연결 중...</h3>
+                    <p>대기열 정보를 불러오고 있습니다</p>
+                </div>
+            `;
+        }
+
+        // Generate QR Code for patient registration
+        function generateQRCode() {
+            // Use the network IP address for mobile access
+            const hostname = window.location.hostname;
+            const port = window.location.port || '8081';
+            
+            // Use the actual network IP address for mobile access
+            let baseUrl;
+            if (hostname === 'localhost' || hostname === '127.0.0.1') {
+                // Use the actual network IP address instead of localhost
+                baseUrl = `http://192.168.70.26:${port}`;
+            } else {
+                baseUrl = window.location.origin;
+            }
+            
+            const registrationUrl = baseUrl + '/index.html';
+            
+            QRCode.toDataURL(registrationUrl, {
+                width: 150,
+                margin: 2,
+                color: {
+                    dark: '#10b981',
+                    light: '#ffffff'
+                }
+            }, function (err, url) {
+                if (err) {
+                    console.error('QR 코드 생성 실패:', err);
+                    return;
+                }
+                document.getElementById('qr-code').src = url;
+                console.log('QR 코드 생성 완료:', registrationUrl);
+            });
+        }
+
+        // Add some interactive features for demo
+        document.addEventListener('keydown', function(e) {
+            // Press 'R' to refresh data
+            if (e.key.toLowerCase() === 'r') {
+                loadWaitingData();
+            }
+        });
+
+        // Add click handler for full screen toggle
+        document.addEventListener('dblclick', function() {
+            if (document.fullscreenElement) {
+                document.exitFullscreen();
+            } else {
+                document.documentElement.requestFullscreen();
+            }
+        });
+
+        // WebSocket 연결 설정
+        let stompClient = null;
+        let isConnected = false;
+
+        function connectWebSocket() {
+            const socket = new SockJS('/ws');
+            stompClient = Stomp.over(socket);
+            
+            stompClient.connect({}, function(frame) {
+                console.log('WebSocket 연결 성공:', frame);
+                isConnected = true;
+                
+                // 환자 호출 메시지 구독
+                stompClient.subscribe('/topic/patient-call', function(message) {
+                    const callData = JSON.parse(message.body);
+                    console.log('환자 호출 메시지 수신:', callData);
+                    
+                    // 호출 메시지 표시
+                    showCallNotification(callData.patientName);
+                    
+                    // 대기열 데이터 새로고침
+                    setTimeout(() => {
+                        loadWaitingData();
+                    }, 1000);
+                });
+                
+            }, function(error) {
+                console.error('WebSocket 연결 실패:', error);
+                isConnected = false;
+                
+                // 재연결 시도
+                setTimeout(() => {
+                    console.log('WebSocket 재연결 시도...');
+                    connectWebSocket();
+                }, 5000);
+            });
+        }
+
+        function showCallNotification(patientName) {
+            // 기존 알림이 있으면 제거
+            const existingNotification = document.getElementById('callNotification');
+            if (existingNotification) {
+                existingNotification.remove();
+            }
+            
+            // 새로운 알림 생성
+            const notification = document.createElement('div');
+            notification.id = 'callNotification';
+            notification.style.cssText = `
+                position: fixed;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+                color: white;
+                padding: 30px 40px;
+                border-radius: 20px;
+                box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+                z-index: 9999;
+                text-align: center;
+                font-size: 1.8em;
+                font-weight: 700;
+                animation: fadeInScale 0.3s ease-out;
+            `;
+            
+            // 애니메이션 CSS 추가
+            const style = document.createElement('style');
+            style.textContent = `
+                @keyframes fadeInScale {
+                    0% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
+                    100% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+                }
+                @keyframes fadeOutScale {
+                    0% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+                    100% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
+                }
+            `;
+            document.head.appendChild(style);
+            
+            notification.innerHTML = `
+                <div style="margin-bottom: 10px;">
+                    <i class="fas fa-user-md" style="font-size: 2em; margin-bottom: 15px;"></i>
+                </div>
+                <div style="font-size: 1.2em; margin-bottom: 5px;">환자 호출</div>
+                <div style="font-size: 1.8em; font-weight: 800; color: #fff;">
+                    ${patientName}님
+                </div>
+                <div style="font-size: 1.1em; margin-top: 10px; opacity: 0.9;">
+                    진료실로 들어와주세요
+                </div>
+                <div id="callCountdown" style="font-size: 0.9em; margin-top: 15px; opacity: 0.8;">
+                    5초 후 메시지가 사라집니다
+                </div>
+            `;
+            
+            document.body.appendChild(notification);
+            
+            // 카운트다운 표시
+            let countdown = 5;
+            const countdownElement = document.getElementById('callCountdown');
+            const countdownInterval = setInterval(() => {
+                countdown--;
+                if (countdown > 0) {
+                    countdownElement.textContent = `${countdown}초 후 메시지가 사라집니다`;
+                } else {
+                    clearInterval(countdownInterval);
+                }
+            }, 1000);
+            
+            // 5초 후 알림 제거
+            setTimeout(() => {
+                clearInterval(countdownInterval);
+                if (notification) {
+                    notification.style.animation = 'fadeOutScale 0.3s ease-in';
+                    setTimeout(() => {
+                        if (notification.parentNode) {
+                            notification.parentNode.removeChild(notification);
+                        }
+                    }, 300);
+                }
+            }, 5000);
+            
+            // 알림음 재생
+            playCallSound();
+        }
+
+        // 페이지 로드 시 WebSocket 연결
+        window.addEventListener('load', function() {
+            connectWebSocket();
+        });
+    </script>
+</body>
+</html>

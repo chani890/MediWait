@@ -1,0 +1,74 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://aws-0-ap-northeast-2.pooler.supabase.com:6543/postgres?sslmode=require&pgbouncer=true&prepareThreshold=0&preparedStatementCacheQueries=0&preparedStatementCacheSizeMiB=0
+    username: postgres.vxamlnzkuwygfeuleuln
+    password: chan0911@
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      pool-name: HospitalQrSystemPool
+      maximum-pool-size: 3
+      minimum-idle: 1
+      connection-timeout: 20000
+      idle-timeout: 300000
+      max-lifetime: 900000
+      leak-detection-threshold: 60000
+      auto-commit: false
+      connection-test-query: SELECT 1
+  
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+        jdbc:
+          time_zone: Asia/Seoul
+          batch_size: 20
+        connection:
+          provider_disables_autocommit: true
+        temp:
+          use_jdbc_metadata_defaults: false
+    open-in-view: false
+  
+  transaction:
+    default-timeout: 30
+    rollback-on-commit-failure: true
+  
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+    time-zone: Asia/Seoul
+  
+  mvc:
+    pathmatch:
+      matching-strategy: ant_path_matcher
+
+server:
+  port: 8081
+
+logging:
+  level:
+    org.example: INFO
+    org.springframework.web: WARN
+    org.hibernate.SQL: WARN
+    org.hibernate.type.descriptor.sql.BasicBinder: WARN
+    com.zaxxer.hikari: WARN
+
+# Supabase 설정
+supabase:
+  url: https://vxamlnzkuwygfeuleuln.supabase.co
+  key: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ4YW1sbnprdXd5Z2ZldWxldWxuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MjA5MzQ5MjcsImV4cCI6MjAzNjUxMDkyN30.cZjTTy1kxZJVVjJ5qAyXUgXUJjqfPZzIcCJjlVpKhJo
+
+# SMS 설정  
+sms:
+  api:
+    key: NCSNQHBDLVYQNXHX
+    secret: CXNLXOQFBZWVHXWRJXISNRJFZJUQBGIS
+    from: 01093134476
+    domain: https://api.coolsms.co.kr
+    
+# WebSocket 설정
+websocket:
+  allowed-origins: "*" 

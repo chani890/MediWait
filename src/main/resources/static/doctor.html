@@ -1,0 +1,2561 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>의사 진료 시스템</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <!-- WebSocket 라이브러리 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.6.1/sockjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f8f9fa;
+            color: #333;
+        }
+
+        /* 암호 입력 화면 스타일 */
+        .password-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+        }
+
+        .password-modal {
+            background: white;
+            padding: 2rem;
+            border-radius: 10px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            text-align: center;
+            max-width: 400px;
+            width: 90%;
+        }
+
+        .password-modal h2 {
+            margin-bottom: 1rem;
+            color: #333;
+        }
+
+        .password-input {
+            width: 100%;
+            padding: 0.8rem;
+            margin: 1rem 0;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            font-size: 1rem;
+            text-align: center;
+        }
+
+        .password-input:focus {
+            outline: none;
+            border-color: #333;
+        }
+
+        .password-btn {
+            width: 100%;
+            padding: 0.8rem;
+            background: white;
+            color: #333;
+            border: 2px solid #333;
+            border-radius: 6px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .password-btn:hover {
+            background: #f8f9fa;
+            border-color: #000;
+            color: #000;
+        }
+
+        .password-error {
+            color: #dc3545;
+            margin-top: 0.5rem;
+            font-size: 0.9rem;
+        }
+
+        .main-content-wrapper {
+            display: none;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            background: white;
+            color: black;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            text-align: left;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+
+        .sidebar {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            height: fit-content;
+        }
+
+        .patient-area {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .section-title {
+            font-size: 1.3em;
+            font-weight: bold;
+            color: #4a5568;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #e2e8f0;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin: 5px;
+            text-decoration: none;
+            display: inline-block;
+            text-align: center;
+        }
+
+        .btn-primary {
+            background: white;
+            color: #333;
+            border: 2px solid #333;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+            background: #f8f9fa;
+            border-color: #000;
+            color: #000;
+        }
+
+        .btn-success {
+            background: white;
+            color: #333;
+            border: 2px solid #333;
+        }
+
+        .btn-success:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+            background: #f8f9fa;
+            border-color: #000;
+            color: #000;
+        }
+
+        .btn-warning {
+            background: white;
+            color: #333;
+            border: 2px solid #333;
+        }
+
+        .btn-warning:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+            background: #f8f9fa;
+            border-color: #000;
+            color: #000;
+        }
+
+        .btn-danger {
+            background: white;
+            color: #333;
+            border: 2px solid #333;
+        }
+
+        .btn-danger:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+            background: #f8f9fa;
+            border-color: #000;
+            color: #000;
+        }
+
+        .waiting-queue {
+            margin-bottom: 30px;
+        }
+
+        .queue-item {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.3s ease;
+        }
+
+        .queue-item:hover {
+            background: #e9ecef;
+            transform: translateX(5px);
+        }
+
+        .queue-item.current {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            border-color: #333;
+            cursor: pointer;
+        }
+
+        .patient-info {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-left: 4px solid #333;
+        }
+
+        .patient-info h3 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .info-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .info-label {
+            font-weight: 600;
+            color: #4a5568;
+        }
+
+        .info-value {
+            color: #2d3748;
+        }
+
+        .prescription-form {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #4a5568;
+        }
+
+        .form-group input,
+        .form-group textarea,
+        .form-group select {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            font-size: 1em;
+            transition: border-color 0.3s ease;
+        }
+
+        .form-group input:focus,
+        .form-group textarea:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #333;
+            box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.1);
+        }
+
+        .form-group textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        .prescription-preview {
+            background: white;
+            border: 2px solid #333;
+            border-radius: 8px;
+            padding: 30px;
+            margin-top: 20px;
+            font-family: 'Malgun Gothic', '맑은 고딕', sans-serif;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .prescription-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            border-bottom: 3px solid #333;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+        }
+
+        .clinic-info {
+            text-align: left;
+        }
+
+        .clinic-info h2 {
+            color: #333;
+            font-size: 1.8em;
+            margin-bottom: 5px;
+        }
+
+        .clinic-info p {
+            color: #666;
+            font-size: 0.9em;
+            margin: 2px 0;
+        }
+
+        .prescription-title {
+            text-align: center;
+        }
+
+        .prescription-title h1 {
+            color: #333;
+            font-size: 2.2em;
+            margin-bottom: 10px;
+            letter-spacing: 2px;
+        }
+
+        .prescription-title p {
+            color: #666;
+            font-size: 1em;
+        }
+
+        .patient-info-section {
+            margin-bottom: 30px;
+        }
+
+        .patient-info-table {
+            width: 100%;
+            border-collapse: collapse;
+            border: 2px solid #333;
+        }
+
+        .patient-info-table td {
+            padding: 12px 15px;
+            border: 1px solid #333;
+            font-size: 1em;
+        }
+
+        .patient-info-table td:first-child,
+        .patient-info-table td:nth-child(3) {
+            background: #f8f9fa;
+            width: 120px;
+            font-weight: 600;
+        }
+
+        .prescription-section {
+            margin-bottom: 25px;
+        }
+
+        .prescription-section h3 {
+            color: #333;
+            font-size: 1.3em;
+            margin-bottom: 15px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #333;
+        }
+
+        .prescription-table {
+            width: 100%;
+            border-collapse: collapse;
+            border: 2px solid #333;
+        }
+
+        .prescription-table th,
+        .prescription-table td {
+            padding: 12px 15px;
+            border: 1px solid #333;
+            text-align: left;
+        }
+
+        .prescription-table th {
+            background: #f8f9fa;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .prescription-table tbody tr:nth-child(even) {
+            background: #f9f9f9;
+        }
+
+        .notes-box,
+        .followup-box {
+            border: 2px solid #333;
+            padding: 15px;
+            background: #f8f9fa;
+            min-height: 60px;
+            border-radius: 4px;
+        }
+
+        .prescription-footer {
+            margin-top: 40px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+        }
+
+        .doctor-info {
+            text-align: left;
+        }
+
+        .doctor-info p {
+            margin: 5px 0;
+            font-size: 1em;
+        }
+
+        .prescription-note {
+            text-align: right;
+            font-size: 0.9em;
+            color: #666;
+        }
+
+        .prescription-note p {
+            margin: 3px 0;
+        }
+
+        .alert {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border: 1px solid;
+        }
+
+        .alert-success {
+            background-color: #d4edda;
+            border-color: #c3e6cb;
+            color: #155724;
+        }
+
+        .alert-error {
+            background-color: #f8d7da;
+            border-color: #f5c6cb;
+            color: #721c24;
+        }
+
+        .alert-warning {
+            background-color: #fff3cd;
+            border-color: #ffeaa7;
+            color: #856404;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        /* EMR 스타일 */
+        .emr-section {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            overflow: visible;
+            position: relative;
+        }
+
+        .section-header {
+            background: white;
+            color: #333;
+            border: 2px solid #333;
+            padding: 12px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .section-header h4 {
+            margin: 0;
+            font-size: 1.1em;
+        }
+
+        .emr-section .form-group,
+        .emr-section .form-row,
+        .emr-section .patient-basic-info,
+        .emr-section .soap-section {
+            padding: 15px 20px;
+        }
+
+        .patient-basic-info {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            background: white;
+        }
+
+        .info-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .info-label {
+            font-weight: 600;
+            color: #4a5568;
+            min-width: 80px;
+        }
+
+        .info-value {
+            color: #2d3748;
+            font-weight: 500;
+        }
+
+        /* SOAP 스타일 */
+        .soap-section {
+            background: white;
+            border-bottom: 1px solid #e9ecef;
+            margin: 0;
+        }
+
+        .soap-section:last-child {
+            border-bottom: none;
+        }
+
+        .soap-label {
+            display: inline-block;
+            width: 25px;
+            height: 25px;
+            background: white;
+            color: #333;
+            border: 2px solid #333;
+            border-radius: 50%;
+            text-align: center;
+            line-height: 21px;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+
+        .soap-section label {
+            font-weight: 600;
+            color: #4a5568;
+            margin-bottom: 8px;
+            display: block;
+        }
+
+        .soap-section textarea {
+            width: 100%;
+            border: 1px solid #e2e8f0;
+            border-radius: 4px;
+            padding: 10px;
+            font-size: 14px;
+            resize: vertical;
+        }
+
+        /* 진단명 검색 드롭다운 */
+        .diagnosis-dropdown, .medication-dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-top: none;
+            border-radius: 0 0 8px 8px;
+            max-height: 300px;
+            overflow-y: auto;
+            z-index: 9999;
+            display: none;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .diagnosis-item, .medication-item {
+            padding: 10px 15px;
+            cursor: pointer;
+            border-bottom: 1px solid #f7fafc;
+            transition: background-color 0.2s;
+        }
+
+        .diagnosis-item:hover, .medication-item:hover {
+            background: #f7fafc;
+        }
+
+        .diagnosis-item:last-child, .medication-item:last-child {
+            border-bottom: none;
+        }
+
+        .medication-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+
+        .medication-info {
+            flex: 1;
+        }
+
+        .medication-name {
+            font-weight: 600;
+            color: #2d3748;
+        }
+
+        .medication-details {
+            font-size: 0.85em;
+            color: #666;
+            margin-top: 2px;
+        }
+
+        .medication-category {
+            font-size: 0.75em;
+            color: #999;
+            background: #f0f0f0;
+            padding: 2px 6px;
+            border-radius: 3px;
+            margin-left: 8px;
+        }
+
+        /* 진단 정보 섹션 특별 스타일 */
+        .diagnosis-section {
+            position: relative;
+            z-index: 100;
+        }
+
+        .diagnosis-section .emr-section {
+            overflow: visible;
+        }
+
+        .diagnosis-name {
+            font-weight: 600;
+            color: #2d3748;
+        }
+
+        .diagnosis-code {
+            font-size: 0.9em;
+            color: #666;
+            margin-left: 10px;
+        }
+
+        /* 약물 처방 테이블 */
+        .medication-table-container {
+            background: white;
+            padding: 20px;
+            overflow-x: auto;
+        }
+
+        .medication-table {
+            width: 100%;
+            border-collapse: collapse;
+            border: 1px solid #e2e8f0;
+        }
+
+        .medication-table th,
+        .medication-table td {
+            border: 1px solid #e2e8f0;
+            padding: 8px 12px;
+            text-align: left;
+        }
+
+        .medication-table th {
+            background: #f7fafc;
+            font-weight: 600;
+            color: #4a5568;
+        }
+
+        .medication-table input,
+        .medication-table select {
+            width: 100%;
+            border: 1px solid #e2e8f0;
+            border-radius: 4px;
+            padding: 5px 8px;
+            font-size: 14px;
+        }
+
+        .medication-table .btn-sm {
+            padding: 4px 8px;
+            font-size: 12px;
+        }
+
+        /* 진단명 테이블 스타일 */
+        .diagnosis-table-container {
+            background: white;
+            padding: 20px;
+            overflow-x: auto;
+            margin-top: 15px;
+        }
+
+        .diagnosis-table {
+            width: 100%;
+            border-collapse: collapse;
+            border: 1px solid #e2e8f0;
+        }
+
+        .diagnosis-table th,
+        .diagnosis-table td {
+            border: 1px solid #e2e8f0;
+            padding: 8px 12px;
+            text-align: left;
+        }
+
+        .diagnosis-table th {
+            background: #f7fafc;
+            font-weight: 600;
+            color: #4a5568;
+        }
+
+        .diagnosis-table .btn-sm {
+            padding: 4px 8px;
+            font-size: 12px;
+        }
+
+        /* 버튼 스타일 개선 */
+        .btn-sm {
+            padding: 6px 12px;
+            font-size: 0.875rem;
+        }
+
+        .btn-danger {
+            background: white;
+            color: #333;
+            border: 2px solid #333;
+        }
+
+        .btn-danger:hover {
+            background: #f8f9fa;
+            border-color: #000;
+            color: #000;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #6c757d;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #6c757d;
+        }
+
+        .empty-state i {
+            font-size: 3em;
+            margin-bottom: 15px;
+            opacity: 0.5;
+        }
+
+        .badge {
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 0.8em;
+            font-weight: 600;
+            background: #e2e8f0;
+            color: #4a5568;
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+                grid-template-columns: 1fr;
+                gap: 20px;
+            }
+            
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- 암호 입력 화면 -->
+    <div id="passwordOverlay" class="password-overlay">
+        <div class="password-modal">
+            <h2><i class="fas fa-lock"></i> 의사 페이지 접근</h2>
+            <p>암호를 입력해주세요</p>
+            <input type="password" id="passwordInput" class="password-input" placeholder="암호 입력" maxlength="20">
+            <button onclick="checkPassword()" class="password-btn">확인</button>
+            <div id="passwordError" class="password-error"></div>
+        </div>
+    </div>
+
+    <!-- 메인 컨텐츠 -->
+    <div class="main-content-wrapper">
+            <div class="header">
+                <h1><i class="fas fa-hospital"></i> 서대 병원</h1>
+            </div>
+
+        <div class="main-content">
+            <!-- 사이드바 -->
+            <div class="sidebar">
+                <div class="section-title">진료 대기열</div>
+                <div class="waiting-queue">
+                    <button class="btn btn-primary" onclick="loadWaitingQueue()" style="width: 100%; margin-bottom: 15px;">
+                        대기열 새로고침
+                    </button>
+                    <div id="waitingQueue" class="loading">
+                        대기열을 불러오는 중...
+                    </div>
+                </div>
+
+                <div class="section-title">진료 중인 환자</div>
+                <div id="currentPatients" class="loading">
+                    진료 중인 환자를 불러오는 중...
+                </div>
+
+                <button class="btn btn-success" onclick="callNextPatient()" style="width: 100%; margin-top: 20px;">
+                    다음 환자 호출
+                </button>
+            </div>
+
+            <!-- 환자 진료 영역 -->
+            <div class="patient-area">
+                <div class="section-title">환자 진료</div>
+                
+                <!-- 알림 메시지 -->
+                <div id="alertMessage" class="hidden"></div>
+
+                <!-- 환자 정보 -->
+                <div id="patientInfo" class="hidden">
+                    <div class="patient-info">
+                        <h3>환자 정보</h3>
+                        <div class="info-grid">
+                            <div class="info-item">
+                                <span class="info-label">환자명:</span>
+                                <span class="info-value" id="patientName">-</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">생년월일:</span>
+                                <span class="info-value" id="patientBirthDate">-</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">전화번호:</span>
+                                <span class="info-value" id="patientPhone">-</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">접수시간:</span>
+                                <span class="info-value" id="receptionTime">-</span>
+                            </div>
+                        </div>
+                        
+                        <!-- 문진표 정보 -->
+                        <div id="surveyInfo" class="hidden">
+                            <h4 style="margin-top: 15px; margin-bottom: 10px; color: #333;">문진표 정보</h4>
+                            <div class="info-item">
+                                <span class="info-label">내원 사유:</span>
+                                <span class="info-value" id="visitReason">-</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">증상:</span>
+                                <span class="info-value" id="symptoms">-</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">알레르기:</span>
+                                <span class="info-value" id="allergies">-</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">복용 약물:</span>
+                                <span class="info-value" id="medications">-</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">과거 병력:</span>
+                                <span class="info-value" id="medicalHistory">-</span>
+                            </div>
+                        </div>
+                        
+                        <!-- 바이탈사인 정보 -->
+                        <div id="vitalSignInfo" class="hidden">
+                            <h4 style="margin-top: 15px; margin-bottom: 10px; color: #333;"><i class="fas fa-stethoscope"></i> 바이탈사인 정보</h4>
+                            <div class="info-grid" style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
+                                <div class="info-item">
+                                    <span class="info-label">체온:</span>
+                                    <span class="info-value" id="vitalBodyTemp">-</span>
+                                </div>
+                                <div class="info-item">
+                                    <span class="info-label">혈압:</span>
+                                    <span class="info-value" id="vitalBloodPressure">-</span>
+                                </div>
+                                <div class="info-item">
+                                    <span class="info-label">맥박:</span>
+                                    <span class="info-value" id="vitalPulse">-</span>
+                                </div>
+                            </div>
+                            <div class="info-item" style="margin-top: 10px;">
+                                <span class="info-label">체크 증상:</span>
+                                <span class="info-value" id="vitalSymptoms">-</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">기타 증상:</span>
+                                <span class="info-value" id="vitalOtherSymptoms">-</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">과거력:</span>
+                                <span class="info-value" id="vitalMedicalHistory">-</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">간호사 메모:</span>
+                                <span class="info-value" id="vitalNurseNotes">-</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">측정 간호사:</span>
+                                <span class="info-value" id="vitalNurseId">-</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- EMR 처방전 작성 폼 -->
+                <div id="prescriptionForm" class="prescription-form hidden">
+                    <h3 style="margin-bottom: 20px; color: #333;"><i class="fas fa-prescription-bottle-alt"></i> EMR 처방전 작성</h3>
+                    
+                    <form id="prescriptionFormData">
+                        <input type="hidden" id="currentReceptionId" name="receptionId">
+                        
+                        <!-- 기본 정보 블록 -->
+                        <div class="emr-section">
+                            <div class="section-header">
+                                <h4>👤 기본 정보</h4>
+                            </div>
+                            <div class="patient-basic-info">
+                                <div class="info-row">
+                                    <span class="info-label">환자명:</span>
+                                    <span class="info-value" id="emrPatientName">-</span>
+                                </div>
+                                <div class="info-row">
+                                    <span class="info-label">생년월일:</span>
+                                    <span class="info-value" id="emrPatientBirth">-</span>
+                                </div>
+                                <div class="info-row">
+                                    <span class="info-label">방문일자:</span>
+                                    <span class="info-value" id="emrVisitDate">-</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 진단 정보 (상병 등록) -->
+                        <div class="emr-section diagnosis-section">
+                            <div class="section-header">
+                                <h4><i class="fas fa-search"></i> 진단 정보 (상병 등록)</h4>
+                                <button type="button" class="btn btn-sm btn-primary" onclick="addDiagnosisRow()">진단명 추가</button>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group" style="position: relative; z-index: 1000;">
+                                    <label for="diagnosisSearch">진단명 검색 *</label>
+                                    <input type="text" id="diagnosisSearch" placeholder="진단명을 입력하세요 (예: 감기, 위염, 고혈압)" autocomplete="off">
+                                    <div id="diagnosisDropdown" class="diagnosis-dropdown"></div>
+                                </div>
+                                <div class="form-group">
+                                    <label for="diagnosisCode">상병코드</label>
+                                    <input type="text" id="diagnosisCode" name="diagnosisCode" readonly placeholder="진단명 선택 시 자동 입력">
+                                </div>
+                            </div>
+                            
+                            <!-- 진단명 테이블 -->
+                            <div class="diagnosis-table-container">
+                                <table class="diagnosis-table">
+                                    <thead>
+                                        <tr>
+                                            <th>진단명</th>
+                                            <th>상병코드</th>
+                                            <th>삭제</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="diagnosisTableBody">
+                                        <!-- 진단명 행들이 동적으로 추가됩니다 -->
+                                    </tbody>
+                                </table>
+                            </div>
+                            
+                            <input type="hidden" id="finalDiagnosis" name="diagnosis">
+                        </div>
+
+                        <!-- SOAP 형식 진료 기록 -->
+                        <div class="emr-section">
+                            <div class="section-header">
+                                <h4><i class="fas fa-edit"></i> SOAP 진료 기록</h4>
+                            </div>
+                            
+                            <!-- S: Subjective (주관적 소견) -->
+                            <div class="soap-section">
+                                <label for="subjective">
+                                    <span class="soap-label">S</span> 주관적 소견 (환자 호소 증상)
+                                </label>
+                                <textarea id="subjective" name="subjective" rows="4" 
+                                    placeholder="환자가 호소하는 증상을 기록하세요 (예: 3일 전부터 목이 아프고 미열이 있음)"></textarea>
+                            </div>
+
+                            <!-- O: Objective (객관적 소견) -->
+                            <div class="soap-section">
+                                <label for="objective">
+                                    <span class="soap-label">O</span> 객관적 소견 (진찰 결과)
+                                </label>
+                                <textarea id="objective" name="objective" rows="2" 
+                                    placeholder="의사의 진찰 결과를 기록하세요 (예: 인두 발적 있음, 체온 37.9℃)"></textarea>
+                            </div>
+
+                            <!-- A: Assessment (평가 및 진단) -->
+                            <div class="soap-section">
+                                <label for="assessment">
+                                    <span class="soap-label">A</span> 평가 및 진단
+                                </label>
+                                <textarea id="assessment" name="assessment" rows="2" 
+                                    placeholder="최종 판단 내용을 기록하세요 (예: 상기도 감염으로 판단됨)"></textarea>
+                            </div>
+
+                            <!-- P: Plan (치료 계획) -->
+                            <div class="soap-section">
+                                <label for="plan">
+                                    <span class="soap-label">P</span> 치료 계획
+                                </label>
+                                <textarea id="plan" name="plan" rows="2" 
+                                    placeholder="치료 계획을 기록하세요 (예: 약물 치료, 생활 지도, 재진 안내 등)"></textarea>
+                            </div>
+                        </div>
+
+                        <!-- 약물 처방 테이블 -->
+                        <div class="emr-section">
+                            <div class="section-header">
+                                <h4>💊 약물 처방</h4>
+                                <button type="button" class="btn btn-sm btn-primary" onclick="addMedicationRow()">약물 추가</button>
+                            </div>
+                            
+                            <!-- 약물 검색 -->
+                            <div class="form-row">
+                                <div class="form-group" style="position: relative; z-index: 999;">
+                                    <label for="medicationSearch">약물 검색</label>
+                                    <input type="text" id="medicationSearch" placeholder="약물명이나 증상을 입력하세요 (예: 타이레놀, 발열, 두통)" autocomplete="off">
+                                    <div id="medicationDropdown" class="medication-dropdown"></div>
+                                </div>
+                            </div>
+                            
+                            <div class="medication-table-container">
+                                <table class="medication-table">
+                                    <thead>
+                                        <tr>
+                                            <th>약물명</th>
+                                            <th>용량</th>
+                                            <th>복용횟수</th>
+                                            <th>처방일수</th>
+                                            <th>복용법</th>
+                                            <th>급여구분</th>
+                                            <th>삭제</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="medicationTableBody">
+                                        <!-- 약물 행들이 동적으로 추가됩니다 -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- 복약지도 -->
+                        <div class="emr-section">
+                            <div class="section-header">
+                                <h4>📋 복약지도</h4>
+                            </div>
+                            <div class="form-group">
+                                <label for="medicationGuidance">복용 방법 및 주의사항</label>
+                                <textarea id="medicationGuidance" name="medicationGuidance" rows="3" 
+                                    placeholder="복용 방법, 주의사항 등을 상세히 기재해주세요 (예: 졸릴 수 있어 운전 금지, 식후 복용)"></textarea>
+                            </div>
+                        </div>
+
+                        <!-- 의사 특이사항 및 재진 -->
+                        <div class="emr-section">
+                            <div class="section-header">
+                                <h4>🩺 의사 소견 및 재진</h4>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="doctorNotes">의사 특이사항</label>
+                                    <textarea id="doctorNotes" name="doctorNotes" rows="2" 
+                                        placeholder="환자 상태, 비고 등을 기재해주세요"></textarea>
+                                </div>
+                                <div class="form-group">
+                                    <label for="followUpDate">재진 날짜</label>
+                                    <select id="followUpDate" name="followUpDate">
+                                        <option value="">재진 불필요</option>
+                                        <option value="3days">3일 후</option>
+                                        <option value="1week">1주일 후</option>
+                                        <option value="2weeks">2주일 후</option>
+                                        <option value="1month">1개월 후</option>
+                                        <option value="2months">2개월 후</option>
+                                        <option value="3months">3개월 후</option>
+                                        <option value="custom">직접 입력</option>
+                                    </select>
+                                    <input type="datetime-local" id="customFollowUpDate" name="customFollowUpDate" class="hidden" style="margin-top: 10px;">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 저장 및 출력 버튼 -->
+                        <div style="text-align: center; margin-top: 30px; padding: 20px; background: #f8f9fa; border-radius: 8px;">
+                            <button type="button" class="btn btn-primary" onclick="savePrescription()">
+                                처방전 저장
+                            </button>
+                            <button type="button" class="btn btn-warning" onclick="previewPrescription()">
+                                처방전 미리보기
+                            </button>
+                            <button type="button" class="btn btn-success" onclick="handleCompleteReception()" id="completeBtn" disabled>
+                                진료 완료
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- 처방전 미리보기 -->
+                <div id="prescriptionPreview" class="prescription-preview hidden">
+                    <div class="prescription-header">
+                        <div class="clinic-info">
+                            <h2>서대 병원</h2>
+                            <p>충북 청주시 서원구 무심서로 377-3 서원대학교 (우: 28674)</p>
+                            <p>전화: 02-1234-5678 | 팩스: 02-1234-5679</p>
+                        </div>
+                        <div class="prescription-title">
+                            <h1>처 방 전</h1>
+                            <p>발행일: <span id="prescriptionDate"></span></p>
+                        </div>
+                    </div>
+                    
+                    <div class="prescription-content">
+                        <div class="patient-info-section">
+                            <table class="patient-info-table">
+                                <tr>
+                                    <td><strong>환자성명:</strong></td>
+                                    <td><span id="previewPatientName"></span></td>
+                                    <td><strong>생년월일:</strong></td>
+                                    <td><span id="previewPatientBirth"></span></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>진단명:</strong></td>
+                                    <td colspan="3"><span id="previewDiagnosis"></span></td>
+                                </tr>
+                            </table>
+                        </div>
+                        
+                        <div class="prescription-section">
+                            <h3>처방내역</h3>
+                            <table class="prescription-table">
+                                <thead>
+                                    <tr>
+                                        <th>약품명</th>
+                                        <th>용법·용량</th>
+                                        <th>투약일수</th>
+                                        <th>비고</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="previewMedicationTableBody">
+                                    <!-- 처방 약물 목록이 여기에 표시됩니다 -->
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                        <div class="prescription-section">
+                            <h3>의사 소견</h3>
+                            <div class="notes-box">
+                                <span id="previewNotes"></span>
+                            </div>
+                        </div>
+                        
+                        <div class="prescription-section">
+                            <h3>재진 예정일</h3>
+                            <div class="followup-box">
+                                <span id="previewFollowUp"></span>
+                            </div>
+                        </div>
+                        
+                        <div class="prescription-footer">
+                            <div class="doctor-info">
+                                <p><strong>처방의사:</strong> 강찬희 (면허번호: 12345)</p>
+                                <p><strong>의료기관:</strong> 컴공 의원</p>
+                            </div>
+                            <div class="prescription-note">
+                                <p>※ 의약품 복용 시 주의사항을 반드시 확인하시기 바랍니다.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 빈 상태 -->
+                <div id="emptyState" class="empty-state">
+                    <div style="font-size: 3em; margin-bottom: 15px; opacity: 0.5;"><i class="fas fa-user-md"></i></div>
+                    <h3>환자를 호출해주세요</h3>
+                    <p>좌측 대기열에서 환자를 호출하여 진료를 시작하세요.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentPatient = null;
+        let currentReception = null;
+        let prescriptionSaved = false;
+
+        // 상병코드 데이터 (실제 의원에서 자주 사용되는 기준)
+        const diagnosisData = [
+            // 감기 / 호흡기
+            { diagnosis: "급성 비인두염", searchTerms: ["감기", "비인두염", "콧물", "코막힘"], code: "J00" },
+            { diagnosis: "급성 인두염", searchTerms: ["인두염", "목감기", "목아픔"], code: "J02.9" },
+            { diagnosis: "급성 편도염", searchTerms: ["편도염", "편도선", "목구멍"], code: "J03.9" },
+            { diagnosis: "급성 기관지염", searchTerms: ["기관지염", "기침", "가래"], code: "J20.9" },
+            { diagnosis: "인플루엔자", searchTerms: ["독감", "인플루엔자", "몸살"], code: "J11.1" },
+            { diagnosis: "알레르기 비염", searchTerms: ["알레르기", "비염", "재채기"], code: "J30.1" },
+            { diagnosis: "부비동염", searchTerms: ["축농증", "부비동염", "코막힘"], code: "J01.9" },
+            { diagnosis: "후두염", searchTerms: ["후두염", "쉰목소리", "목소리"], code: "J04.0" },
+            { diagnosis: "천식", searchTerms: ["천식", "숨가쁨", "호흡곤란"], code: "J45.9" },
+            
+            // 소화기계
+            { diagnosis: "급성 위장염", searchTerms: ["위장염", "설사", "복통", "장염"], code: "K52.9" },
+            { diagnosis: "기능성 소화불량", searchTerms: ["소화불량", "체함", "속쓰림"], code: "K30" },
+            { diagnosis: "위염", searchTerms: ["위염", "속쓰림", "위통"], code: "K29.7" },
+            { diagnosis: "위·십이지장 궤양", searchTerms: ["궤양", "위궤양", "십이지장"], code: "K27.9" },
+            { diagnosis: "역류성 식도염", searchTerms: ["역류성", "식도염", "속쓰림"], code: "K21.0" },
+            { diagnosis: "과민성 대장 증후군", searchTerms: ["과민성", "대장", "변비", "설사"], code: "K58.9" },
+            
+            // 내분비·대사
+            { diagnosis: "제2형 당뇨병", searchTerms: ["당뇨병", "당뇨", "혈당"], code: "E11.9" },
+            { diagnosis: "고지혈증", searchTerms: ["고지혈증", "콜레스테롤", "중성지방"], code: "E78.5" },
+            { diagnosis: "갑상선 기능저하증", searchTerms: ["갑상선", "기능저하", "갑저"], code: "E03.9" },
+            { diagnosis: "갑상선 기능항진증", searchTerms: ["갑상선", "기능항진", "갑항"], code: "E05.9" },
+            
+            // 순환기계
+            { diagnosis: "고혈압", searchTerms: ["고혈압", "혈압", "고혈압증"], code: "I10" },
+            { diagnosis: "협심증", searchTerms: ["협심증", "가슴통증", "흉통"], code: "I20.9" },
+            { diagnosis: "부정맥", searchTerms: ["부정맥", "심장", "두근거림"], code: "I49.9" },
+            { diagnosis: "하지정맥류", searchTerms: ["정맥류", "하지", "다리"], code: "I83.9" },
+            
+            // 신경계 / 정신과
+            { diagnosis: "편두통", searchTerms: ["편두통", "두통", "머리아픔"], code: "G43.9" },
+            { diagnosis: "긴장성 두통", searchTerms: ["긴장성", "두통", "스트레스"], code: "G44.2" },
+            { diagnosis: "어지럼증", searchTerms: ["어지럼증", "현기증", "어지러움"], code: "R42" },
+            { diagnosis: "불면증", searchTerms: ["불면증", "잠", "수면"], code: "F51.0" },
+            { diagnosis: "우울증", searchTerms: ["우울증", "우울", "기분"], code: "F32.9" },
+            { diagnosis: "불안장애", searchTerms: ["불안", "불안장애", "공황"], code: "F41.9" },
+            
+            // 근골격계
+            { diagnosis: "요통", searchTerms: ["요통", "허리", "허리통증"], code: "M54.5" },
+            { diagnosis: "목 통증", searchTerms: ["목통증", "경추통", "목", "어깨"], code: "M54.2" },
+            { diagnosis: "무릎 관절염", searchTerms: ["무릎", "관절염", "무릎통증"], code: "M17.9" },
+            { diagnosis: "어깨통증", searchTerms: ["어깨", "어깨통증", "오십견"], code: "M75.1" },
+            { diagnosis: "테니스엘보", searchTerms: ["테니스엘보", "팔꿈치", "엘보"], code: "M77.1" },
+            { diagnosis: "손목터널증후군", searchTerms: ["손목", "터널", "손목통증"], code: "G56.0" },
+            
+            // 피부과 / 감염성
+            { diagnosis: "대상포진", searchTerms: ["대상포진", "포진", "띠"], code: "B02.9" },
+            { diagnosis: "단순포진", searchTerms: ["단순포진", "헤르페스", "입술"], code: "B00.9" },
+            { diagnosis: "알레르기성 피부염", searchTerms: ["알레르기", "피부염", "습진"], code: "L23.9" },
+            { diagnosis: "두드러기", searchTerms: ["두드러기", "가려움", "발진"], code: "L50.9" },
+            { diagnosis: "무좀", searchTerms: ["무좀", "족부백선", "발가락"], code: "B35.3" },
+            
+            // 소아과 / 기타
+            { diagnosis: "급성 장염", searchTerms: ["장염", "설사", "복통"], code: "A09" },
+            { diagnosis: "바이러스성 감염", searchTerms: ["바이러스", "감염", "열"], code: "B34.9" },
+            { diagnosis: "발열", searchTerms: ["발열", "열", "고열"], code: "R50.9" },
+            { diagnosis: "급성 중이염", searchTerms: ["중이염", "귀", "귀통증"], code: "H66.9" }
+        ];
+
+        // 약물 데이터 (실제 의원에서 자주 사용되는 기준)
+        const medicationData = [
+            // 감기 / 호흡기
+            { name: "타이레놀", ingredient: "아세트아미노펜", dosage: "500mg", frequency: "1일 3회", symptoms: ["발열", "두통", "몸살", "해열", "진통"], category: "감기/호흡기" },
+            { name: "이부프로펜", ingredient: "이부프로펜", dosage: "200mg", frequency: "1일 3회", symptoms: ["두통", "치통", "관절통", "염증", "해열"], category: "진통/소염" },
+            { name: "세티리진", ingredient: "세티리진염산염", dosage: "10mg", frequency: "1일 1회", symptoms: ["알레르기", "비염", "재채기", "콧물", "가려움"], category: "알레르기" },
+            { name: "로라타딘", ingredient: "로라타딘", dosage: "10mg", frequency: "1일 1회", symptoms: ["콧물", "코막힘", "피부가려움", "알레르기"], category: "알레르기" },
+            { name: "클로페라스틴", ingredient: "클로페라스틴염산염", dosage: "10mg", frequency: "1일 3회", symptoms: ["마른기침", "기침"], category: "감기/호흡기" },
+            { name: "암브록솔", ingredient: "암브록솔염산염", dosage: "30mg", frequency: "1일 3회", symptoms: ["가래", "기침완화", "거담"], category: "감기/호흡기" },
+            { name: "엘도스", ingredient: "에르도스테인", dosage: "300mg", frequency: "1일 2회", symptoms: ["진한가래", "인후염", "거담"], category: "감기/호흡기" },
+            { name: "푸라콜", ingredient: "복합제", dosage: "용량고정", frequency: "1일 3회", symptoms: ["종합감기", "해열", "진통", "기침"], category: "감기/호흡기" },
+            
+            // 위장약 / 소화제
+            { name: "가스모틴", ingredient: "모사프리드", dosage: "5mg", frequency: "1일 3회", symptoms: ["소화불량", "위정체감", "속쓰림"], category: "위장약" },
+            { name: "무사프리드", ingredient: "무사프리드시트르산염", dosage: "5mg", frequency: "1일 3회", symptoms: ["소화불량"], category: "위장약" },
+            { name: "라베프라졸", ingredient: "라베프라졸나트륨", dosage: "10-20mg", frequency: "1일 1회", symptoms: ["위염", "식도염", "속쓰림", "위산역류"], category: "위장약" },
+            { name: "에소메프라졸", ingredient: "에소메프라졸마그네슘", dosage: "20mg", frequency: "1일 1회", symptoms: ["위산역류", "위염"], category: "위장약" },
+            { name: "알마게이트", ingredient: "알마게이트", dosage: "15ml", frequency: "1일 3회 식후", symptoms: ["위산과다", "속쓰림"], category: "위장약" },
+            { name: "겔포스", ingredient: "알루미늄/마그네슘 혼합", dosage: "15ml", frequency: "1일 3회", symptoms: ["제산작용", "속쓰림"], category: "위장약" },
+            { name: "훼스탈", ingredient: "복합 소화효소", dosage: "1-2정", frequency: "식후", symptoms: ["소화불량", "과식"], category: "위장약" },
+            
+            // 통증 / 근골격계
+            { name: "덱시부프로펜", ingredient: "덱시부프로펜", dosage: "300mg", frequency: "1일 3회", symptoms: ["근육통", "요통"], category: "진통/소염" },
+            { name: "트라마돌", ingredient: "트라마돌염산염", dosage: "50-100mg", frequency: "1일 2-3회", symptoms: ["신경통", "디스크통증"], category: "진통/소염" },
+            { name: "세레콕시브", ingredient: "세레콕시브", dosage: "200mg", frequency: "1일 1-2회", symptoms: ["관절염", "류마티즘"], category: "진통/소염" },
+            { name: "로렉신정", ingredient: "록소프로펜", dosage: "60mg", frequency: "1일 3회", symptoms: ["급성근육통", "염좌"], category: "진통/소염" },
+            
+            // 항생제 (감염 시)
+            { name: "아목사실린", ingredient: "아목시실린", dosage: "500mg", frequency: "1일 3회", symptoms: ["인후염", "편도염"], category: "항생제" },
+            { name: "클래리스로마이신", ingredient: "클래리스로마이신", dosage: "250-500mg", frequency: "1일 2회", symptoms: ["기관지염", "폐렴"], category: "항생제" },
+            { name: "세파클러", ingredient: "세팔로스포린계", dosage: "250mg", frequency: "1일 3회", symptoms: ["중이염", "축농증"], category: "항생제" },
+            { name: "세픽심", ingredient: "세픽심", dosage: "100-200mg", frequency: "1일 2회", symptoms: ["요로감염", "상기도감염"], category: "항생제" },
+            { name: "레보플록사신", ingredient: "레보플록사신", dosage: "500mg", frequency: "1일 1회", symptoms: ["폐렴", "방광염"], category: "항생제" },
+            
+            // 알레르기 / 피부 질환
+            { name: "레보세티리진", ingredient: "레보세티리진", dosage: "5mg", frequency: "1일 1회", symptoms: ["비염", "아토피"], category: "알레르기" },
+            { name: "하이드로코르티손 연고", ingredient: "하이드로코르티손", dosage: "적량", frequency: "1일 1-2회 도포", symptoms: ["습진", "피부염"], category: "외용제" },
+            { name: "퓨시드산 연고", ingredient: "퓨시드산", dosage: "적량", frequency: "국소도포 1일 2-3회", symptoms: ["상처", "염증"], category: "외용제" },
+            { name: "무피로신 연고", ingredient: "무피로신", dosage: "적량", frequency: "국소도포 1일 2-3회", symptoms: ["세균감염", "피부질환"], category: "외용제" }
+        ];
+
+        // WebSocket 연결 설정
+        let stompClient = null;
+        let isConnected = false;
+
+        function connectWebSocket() {
+            const socket = new SockJS('/ws');
+            stompClient = Stomp.over(socket);
+            
+            stompClient.connect({}, function(frame) {
+                console.log('WebSocket 연결 성공:', frame);
+                isConnected = true;
+                
+                // 대기열 업데이트 구독
+                stompClient.subscribe('/topic/waiting-queue', function(message) {
+                    const data = JSON.parse(message.body);
+                    console.log('대기열 업데이트 수신:', data);
+                    
+                    if (data.type === 'QUEUE_UPDATE') {
+                        // 대기열 자동 새로고침
+                        loadWaitingQueue();
+                        loadCurrentPatients();
+                    }
+                });
+                
+            }, function(error) {
+                console.error('WebSocket 연결 실패:', error);
+                isConnected = false;
+                
+                // 재연결 시도
+                setTimeout(() => {
+                    console.log('WebSocket 재연결 시도...');
+                    connectWebSocket();
+                }, 5000);
+            });
+        }
+
+        // 페이지 로드 시 초기화
+        document.addEventListener('DOMContentLoaded', function() {
+            loadWaitingQueue();
+            loadCurrentPatients();
+            
+            // WebSocket 연결
+            connectWebSocket();
+            
+            // 폴백: 30초마다 대기열 새로고침 (WebSocket 연결 실패 시)
+            setInterval(() => {
+                if (!isConnected) {
+                    loadWaitingQueue();
+                    loadCurrentPatients();
+                }
+            }, 30000);
+            
+            // 재진 날짜 선택 이벤트 리스너 추가
+            document.getElementById('followUpDate').addEventListener('change', function() {
+                const customDateInput = document.getElementById('customFollowUpDate');
+                if (this.value === 'custom') {
+                    customDateInput.classList.remove('hidden');
+                } else {
+                    customDateInput.classList.add('hidden');
+                }
+            });
+
+            // 진단명 검색 자동완성 이벤트 리스너
+            setupDiagnosisSearch();
+            
+            // 약물 검색 자동완성 이벤트 리스너
+            setupMedicationSearch();
+            
+            // 첫 번째 약물 행 추가
+            addMedicationRow();
+            
+            // 첫 번째 진단명 행 추가
+            addDiagnosisRow();
+        });
+
+        // ========== 진단명 검색 자동완성 ==========
+        
+        function setupDiagnosisSearch() {
+            const searchInput = document.getElementById('diagnosisSearch');
+            const dropdown = document.getElementById('diagnosisDropdown');
+            
+            searchInput.addEventListener('input', function() {
+                const query = this.value.toLowerCase().trim();
+                
+                if (query.length < 1) {
+                    dropdown.style.display = 'none';
+                    return;
+                }
+                
+                // 검색 결과 필터링
+                const results = diagnosisData.filter(item => {
+                    return item.diagnosis.toLowerCase().includes(query) ||
+                           item.code.toLowerCase().includes(query) ||
+                           item.searchTerms.some(term => term.toLowerCase().includes(query));
+                });
+                
+                displayDiagnosisResults(results);
+            });
+            
+            // 외부 클릭 시 드롭다운 숨김
+            document.addEventListener('click', function(e) {
+                if (!e.target.closest('.form-group')) {
+                    dropdown.style.display = 'none';
+                }
+            });
+        }
+        
+        function displayDiagnosisResults(results) {
+            const dropdown = document.getElementById('diagnosisDropdown');
+            
+            if (results.length === 0) {
+                dropdown.style.display = 'none';
+                return;
+            }
+            
+            dropdown.innerHTML = results.map(item => `
+                <div class="diagnosis-item" onclick="selectDiagnosis('${item.diagnosis}', '${item.code}')">
+                    <span class="diagnosis-name">${item.diagnosis}</span>
+                    <span class="diagnosis-code">${item.code}</span>
+                </div>
+            `).join('');
+            
+            dropdown.style.display = 'block';
+        }
+        
+        function selectDiagnosis(diagnosis, code) {
+            document.getElementById('diagnosisSearch').value = diagnosis;
+            document.getElementById('diagnosisCode').value = code;
+            document.getElementById('finalDiagnosis').value = diagnosis;
+            document.getElementById('diagnosisDropdown').style.display = 'none';
+            
+            // 자동으로 진단명 테이블에 추가
+            addDiagnosisFromSearch();
+        }
+
+        // ========== 약물 검색 자동완성 ==========
+        
+        function setupMedicationSearch() {
+            const searchInput = document.getElementById('medicationSearch');
+            const dropdown = document.getElementById('medicationDropdown');
+            
+            searchInput.addEventListener('input', function() {
+                const query = this.value.toLowerCase().trim();
+                
+                if (query.length < 1) {
+                    dropdown.style.display = 'none';
+                    return;
+                }
+                
+                // 검색 결과 필터링
+                const results = medicationData.filter(item => {
+                    return item.name.toLowerCase().includes(query) ||
+                           item.ingredient.toLowerCase().includes(query) ||
+                           item.category.toLowerCase().includes(query) ||
+                           item.symptoms.some(symptom => symptom.toLowerCase().includes(query));
+                });
+                
+                displayMedicationResults(results);
+            });
+            
+            // 외부 클릭 시 드롭다운 숨김
+            document.addEventListener('click', function(e) {
+                if (!e.target.closest('.form-group')) {
+                    dropdown.style.display = 'none';
+                }
+            });
+        }
+        
+        function displayMedicationResults(results) {
+            const dropdown = document.getElementById('medicationDropdown');
+            
+            if (results.length === 0) {
+                dropdown.style.display = 'none';
+                return;
+            }
+            
+            dropdown.innerHTML = results.map(item => `
+                <div class="medication-item" onclick="selectMedication('${item.name}', '${item.ingredient}', '${item.dosage}', '${item.frequency}', '${item.category}')">
+                    <div class="medication-info">
+                        <div class="medication-name">${item.name}</div>
+                        <div class="medication-details">${item.ingredient} | ${item.dosage} ${item.frequency}</div>
+                        <div class="medication-details">적응증: ${item.symptoms.join(', ')}</div>
+                    </div>
+                    <div class="medication-category">${item.category}</div>
+                </div>
+            `).join('');
+            
+            dropdown.style.display = 'block';
+        }
+        
+        function selectMedication(name, ingredient, dosage, frequency, category) {
+            // 약물 검색 필드 초기화
+            document.getElementById('medicationSearch').value = '';
+            document.getElementById('medicationDropdown').style.display = 'none';
+            
+            // 새로운 약물 행을 추가하고 선택된 약물 정보로 채우기
+            addMedicationFromSearch(name, ingredient, dosage, frequency, category);
+        }
+        
+        function addMedicationFromSearch(name, ingredient, dosage, frequency, category) {
+            const tableBody = document.getElementById('medicationTableBody');
+            const rowCount = tableBody.children.length;
+            
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>
+                    <input type="text" name="medicationName[]" value="${name}" placeholder="약물명">
+                </td>
+                <td>
+                    <input type="text" name="dosage[]" value="${dosage}" placeholder="용량 (예: 500mg)">
+                </td>
+                <td>
+                    <select name="frequency[]">
+                        <option value="">선택</option>
+                        <option value="1일 1회" ${frequency === '1일 1회' ? 'selected' : ''}>1일 1회</option>
+                        <option value="1일 2회" ${frequency === '1일 2회' ? 'selected' : ''}>1일 2회</option>
+                        <option value="1일 3회" ${frequency === '1일 3회' ? 'selected' : ''}>1일 3회</option>
+                        <option value="1일 4회" ${frequency === '1일 4회' ? 'selected' : ''}>1일 4회</option>
+                        <option value="1일 2-3회" ${frequency === '1일 2-3회' ? 'selected' : ''}>1일 2-3회</option>
+                        <option value="필요시" ${frequency === '필요시' ? 'selected' : ''}>필요시</option>
+                    </select>
+                </td>
+                <td>
+                    <select name="days[]">
+                        <option value="">선택</option>
+                        <option value="1일분">1일분</option>
+                        <option value="2일분">2일분</option>
+                        <option value="3일분" selected>3일분</option>
+                        <option value="5일분">5일분</option>
+                        <option value="7일분">7일분</option>
+                        <option value="10일분">10일분</option>
+                        <option value="14일분">14일분</option>
+                        <option value="30일분">30일분</option>
+                    </select>
+                </td>
+                <td>
+                    <select name="dosageInstructions[]">
+                        <option value="">선택</option>
+                        <option value="식전 30분" ${frequency.includes('식전') ? 'selected' : ''}>식전 30분</option>
+                        <option value="식후 30분" selected>식후 30분</option>
+                        <option value="식간">식간</option>
+                        <option value="취침전">취침전</option>
+                        <option value="아침 공복">아침 공복</option>
+                        <option value="필요시">필요시</option>
+                    </select>
+                </td>
+                <td>
+                    <select name="coverage[]">
+                        <option value="급여" selected>급여</option>
+                        <option value="비급여">비급여</option>
+                    </select>
+                </td>
+                <td>
+                    <button type="button" class="btn btn-sm btn-danger" onclick="removeMedicationRow(this)">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </td>
+            `;
+            
+            tableBody.appendChild(row);
+        }
+
+        // ========== 약물 처방 테이블 관리 ==========
+        
+        let medicationRowCount = 0;
+        let diagnosisRowCount = 0;
+        
+        function addMedicationRow() {
+            const tableBody = document.getElementById('medicationTableBody');
+            const rowId = `medication-row-${++medicationRowCount}`;
+            
+            const row = document.createElement('tr');
+            row.id = rowId;
+            row.innerHTML = `
+                <td><input type="text" name="medicationName[]" placeholder="약물명 입력 (검색 기능 활용)"></td>
+                <td><input type="text" name="dosage[]" placeholder="500mg (용량 조정 가능)"></td>
+                <td>
+                    <select name="frequency[]">
+                        <option value="">선택</option>
+                        <option value="1일 1회">1일 1회</option>
+                        <option value="1일 2회">1일 2회</option>
+                        <option value="1일 3회">1일 3회</option>
+                        <option value="1일 4회">1일 4회</option>
+                        <option value="1일 2-3회">1일 2-3회</option>
+                        <option value="필요시">필요시</option>
+                    </select>
+                </td>
+                <td>
+                    <select name="days[]">
+                        <option value="">선택</option>
+                        <option value="1일분">1일분</option>
+                        <option value="2일분">2일분</option>
+                        <option value="3일분">3일분</option>
+                        <option value="5일분">5일분</option>
+                        <option value="7일분">7일분</option>
+                        <option value="10일분">10일분</option>
+                        <option value="14일분">14일분</option>
+                        <option value="30일분">30일분</option>
+                    </select>
+                </td>
+                <td>
+                    <select name="dosageInstructions[]">
+                        <option value="">선택</option>
+                        <option value="식전 30분">식전 30분</option>
+                        <option value="식후 30분">식후 30분</option>
+                        <option value="식간">식간</option>
+                        <option value="취침전">취침전</option>
+                        <option value="아침 공복">아침 공복</option>
+                        <option value="필요시">필요시</option>
+                    </select>
+                </td>
+                <td>
+                    <select name="coverage[]">
+                        <option value="급여">급여</option>
+                        <option value="비급여">비급여</option>
+                    </select>
+                </td>
+                <td>
+                    <button type="button" class="btn btn-sm btn-danger" onclick="removeMedicationRow(this)">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </td>
+            `;
+            
+            tableBody.appendChild(row);
+        }
+        
+        function removeMedicationRow(button) {
+            const row = button.closest('tr');
+            if (row) {
+                row.remove();
+            }
+            
+            // 최소 1개 행은 유지
+            const remainingRows = document.querySelectorAll('#medicationTableBody tr');
+            if (remainingRows.length === 0) {
+                addMedicationRow();
+            }
+        }
+        
+        // 약물 처방 데이터 수집
+        function collectMedicationData() {
+            const rows = document.querySelectorAll('#medicationTableBody tr');
+            const medications = [];
+            
+            rows.forEach(row => {
+                const name = row.querySelector('input[name="medicationName[]"]').value;
+                const dosage = row.querySelector('input[name="dosage[]"]').value;
+                const frequency = row.querySelector('select[name="frequency[]"]').value;
+                const days = row.querySelector('select[name="days[]"]').value;
+                const instructions = row.querySelector('select[name="dosageInstructions[]"]').value;
+                const coverage = row.querySelector('select[name="coverage[]"]').value;
+                
+                if (name.trim()) {
+                    medications.push({
+                        name: name.trim(),
+                        dosage: dosage.trim(),
+                        frequency: frequency,
+                        days: days,
+                        instructions: instructions,
+                        coverage: coverage
+                    });
+                }
+            });
+            
+            return medications;
+        }
+
+        // ========== 진단명 관리 함수들 ==========
+        function addDiagnosisRow() {
+            const tableBody = document.getElementById('diagnosisTableBody');
+            const rowId = `diagnosis-row-${++diagnosisRowCount}`;
+            
+            const row = document.createElement('tr');
+            row.id = rowId;
+            row.innerHTML = `
+                <td><input type="text" name="diagnosisName[]" placeholder="진단명 입력" readonly></td>
+                <td><input type="text" name="diagnosisCode[]" placeholder="상병코드" readonly></td>
+                <td>
+                    <button type="button" class="btn btn-sm btn-danger" onclick="removeDiagnosisRow('${rowId}')">
+                        삭제
+                    </button>
+                </td>
+            `;
+            
+            tableBody.appendChild(row);
+        }
+
+        function removeDiagnosisRow(rowId) {
+            const row = document.getElementById(rowId);
+            if (row) {
+                row.remove();
+            }
+            
+            // 테이블이 비어있으면 하나 추가
+            const remainingRows = document.querySelectorAll('#diagnosisTableBody tr');
+            if (remainingRows.length === 0) {
+                addDiagnosisRow();
+            }
+        }
+
+        function addDiagnosisFromSearch() {
+            const diagnosisName = document.getElementById('diagnosisSearch').value;
+            const diagnosisCode = document.getElementById('diagnosisCode').value;
+            
+            if (!diagnosisName.trim()) {
+                showAlert('진단명을 입력해주세요.', 'error');
+                return;
+            }
+            
+            // 새로운 행 추가
+            addDiagnosisRow();
+            
+            // 마지막 행에 데이터 입력
+            const lastRow = document.querySelector('#diagnosisTableBody tr:last-child');
+            if (lastRow) {
+                lastRow.querySelector('input[name="diagnosisName[]"]').value = diagnosisName.trim();
+                lastRow.querySelector('input[name="diagnosisCode[]"]').value = diagnosisCode.trim();
+            }
+            
+            // 검색 필드 초기화
+            document.getElementById('diagnosisSearch').value = '';
+            document.getElementById('diagnosisCode').value = '';
+        }
+
+        function collectDiagnosisData() {
+            const rows = document.querySelectorAll('#diagnosisTableBody tr');
+            const diagnoses = [];
+            
+            rows.forEach(row => {
+                const name = row.querySelector('input[name="diagnosisName[]"]').value;
+                const code = row.querySelector('input[name="diagnosisCode[]"]').value;
+                
+                if (name.trim()) {
+                    diagnoses.push({
+                        name: name.trim(),
+                        code: code.trim()
+                    });
+                }
+            });
+            
+            return diagnoses;
+        }
+
+                // 대기열 불러오기
+        async function loadWaitingQueue() {
+            try {
+                const response = await fetch('/api/doctor/waiting-queue');
+                const waitingQueue = await response.json();
+                
+                const queueContainer = document.getElementById('waitingQueue');
+                
+                // 응답이 배열인지 확인
+                if (!Array.isArray(waitingQueue)) {
+                    console.error('waitingQueue is not an array:', waitingQueue);
+                    queueContainer.innerHTML = '<div class="empty-state"><p>대기열 정보를 불러오는데 실패했습니다.</p></div>';
+                    return;
+                }
+                
+                if (waitingQueue.length === 0) {
+                    queueContainer.innerHTML = '<div class="empty-state"><p>대기 중인 환자가 없습니다.</p></div>';
+                    return;
+                }
+
+                queueContainer.innerHTML = waitingQueue.map(reception => `
+                    <div class="queue-item">
+                        <div>
+                            <strong>${reception.patientName}</strong><br>
+                            <small>접수시간: ${new Date(reception.createdAt).toLocaleString()}</small>
+                        </div>
+                        <div>
+                            <span class="badge">대기중</span>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('대기열 로드 실패:', error);
+                const queueContainer = document.getElementById('waitingQueue');
+                queueContainer.innerHTML = '<div class="empty-state"><p>대기열을 불러오는데 실패했습니다.</p></div>';
+            }
+        }
+
+        // 현재 진료 중인 환자 불러오기
+        async function loadCurrentPatients() {
+            try {
+                const response = await fetch('/api/doctor/current-patients');
+                const currentPatients = await response.json();
+                
+                const container = document.getElementById('currentPatients');
+                
+                // 응답이 배열인지 확인
+                if (!Array.isArray(currentPatients)) {
+                    console.error('currentPatients is not an array:', currentPatients);
+                    container.innerHTML = '<div class="empty-state"><p>진료 중인 환자가 없습니다.</p></div>';
+                    return;
+                }
+                
+                if (currentPatients.length === 0) {
+                    container.innerHTML = '<div class="empty-state"><p>진료 중인 환자가 없습니다.</p></div>';
+                    return;
+                }
+
+                container.innerHTML = currentPatients.map(patient => `
+                    <div class="queue-item current" onclick="selectPatient(${patient.patientId}, ${patient.currentReceptionId})">
+                        <div>
+                            <strong>${patient.name}</strong><br>
+                            <small>호출시간: ${patient.currentReception && patient.currentReception.calledAt ? new Date(patient.currentReception.calledAt).toLocaleString() : '정보 없음'}</small>
+                        </div>
+                        <div>
+                            <span class="badge">진료중</span>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('현재 환자 로드 실패:', error);
+                const container = document.getElementById('currentPatients');
+                container.innerHTML = '<div class="empty-state"><p>현재 환자 정보를 불러오는데 실패했습니다.</p></div>';
+            }
+        }
+
+        // 다음 환자 호출
+        async function callNextPatient() {
+            try {
+                const response = await fetch('/api/doctor/call-next', {
+                    method: 'POST'
+                });
+                
+                if (!response.ok) {
+                    throw new Error('환자 호출 실패');
+                }
+                
+                const patientInfo = await response.json();
+                
+                // currentReception 설정
+                currentReception = patientInfo.currentReception;
+                console.log('환자 호출 후 currentReception 설정됨:', currentReception);
+                
+                showPatientInfo(patientInfo);
+                showAlert('환자가 호출되었습니다.', 'success');
+                
+                // 대기열과 현재 환자 목록 새로고침
+                loadWaitingQueue();
+                loadCurrentPatients();
+            } catch (error) {
+                console.error('환자 호출 실패:', error);
+                showAlert('환자 호출에 실패했습니다. ' + error.message, 'error');
+            }
+        }
+
+        // 환자 선택 (진료 중인 환자 클릭 시)
+        async function selectPatient(patientId, receptionId) {
+            try {
+                console.log('환자 선택:', patientId, '접수 ID:', receptionId);
+                const response = await fetch(`/api/doctor/patient/${patientId}`);
+                const patientInfo = await response.json();
+                
+                // 현재 접수 ID 설정
+                patientInfo.currentReceptionId = receptionId;
+                
+                // currentReception 객체 생성 (진료 완료에 필요)
+                currentReception = {
+                    id: receptionId,
+                    patientId: patientId
+                };
+                
+                console.log('currentReception 설정됨:', currentReception);
+                showPatientInfo(patientInfo);
+                
+                // 기존 처방전이 있는지 확인
+                await checkExistingPrescription(receptionId);
+            } catch (error) {
+                console.error('환자 정보 로드 실패:', error);
+                showAlert('환자 정보를 불러오는데 실패했습니다.', 'error');
+            }
+        }
+
+        // 환자 정보 표시
+        function showPatientInfo(patientInfo) {
+            currentPatient = patientInfo;
+            
+            // currentReception이 이미 설정되지 않았다면 patientInfo에서 가져오기
+            if (!currentReception && patientInfo.currentReception) {
+                currentReception = patientInfo.currentReception;
+            }
+            
+            console.log('showPatientInfo - currentPatient:', currentPatient);
+            console.log('showPatientInfo - currentReception:', currentReception);
+            
+            // 빈 상태 숨기기
+            document.getElementById('emptyState').classList.add('hidden');
+            
+            // 환자 정보 표시 (기존)
+            document.getElementById('patientInfo').classList.remove('hidden');
+            document.getElementById('patientName').textContent = patientInfo.name;
+            document.getElementById('patientBirthDate').textContent = patientInfo.birthDate;
+            document.getElementById('patientPhone').textContent = patientInfo.phoneNumber || '미등록';
+            
+            if (currentReception && currentReception.createdAt) {
+                document.getElementById('receptionTime').textContent = new Date(currentReception.createdAt).toLocaleString();
+            } else {
+                document.getElementById('receptionTime').textContent = '-';
+            }
+            
+            // EMR 기본 정보 표시
+            document.getElementById('emrPatientName').textContent = patientInfo.name;
+            document.getElementById('emrPatientBirth').textContent = patientInfo.birthDate;
+            document.getElementById('emrVisitDate').textContent = new Date().toLocaleDateString('ko-KR');
+            
+            // 현재 접수 ID 설정
+            const receptionId = patientInfo.currentReceptionId || (currentReception ? currentReception.id : null);
+            if (receptionId) {
+                document.getElementById('currentReceptionId').value = receptionId;
+            }
+            
+            // 문진표 정보 표시
+            if (patientInfo.latestSurvey) {
+                document.getElementById('surveyInfo').classList.remove('hidden');
+                document.getElementById('visitReason').textContent = patientInfo.latestSurvey.visitReason || '-';
+                document.getElementById('symptoms').textContent = patientInfo.latestSurvey.symptoms || '-';
+                document.getElementById('allergies').textContent = patientInfo.latestSurvey.allergies || '-';
+                document.getElementById('medications').textContent = patientInfo.latestSurvey.medications || '-';
+                document.getElementById('medicalHistory').textContent = patientInfo.latestSurvey.medicalHistory || '-';
+                
+                // 문진표 정보를 SOAP의 S(주관적 소견)에 자동 입력
+                const subjectiveText = [];
+                const survey = patientInfo.latestSurvey;
+                if (survey.visitReason) subjectiveText.push(`내원사유: ${survey.visitReason}`);
+                if (survey.symptoms) subjectiveText.push(`증상: ${survey.symptoms}`);
+                if (survey.allergies && survey.allergies !== '없음') subjectiveText.push(`알레르기: ${survey.allergies}`);
+                if (survey.medications && survey.medications !== '없음') subjectiveText.push(`복용약물: ${survey.medications}`);
+                if (survey.medicalHistory && survey.medicalHistory !== '없음') subjectiveText.push(`과거병력: ${survey.medicalHistory}`);
+                
+                document.getElementById('subjective').value = subjectiveText.join('\n');
+            } else {
+                document.getElementById('surveyInfo').classList.add('hidden');
+            }
+            
+            // 바이탈사인 정보 로드 및 표시
+            const currentReceptionId = patientInfo.currentReceptionId || (currentReception ? currentReception.id : null);
+            if (currentReceptionId) {
+                loadVitalSignInfo(currentReceptionId);
+            } else {
+                document.getElementById('vitalSignInfo').classList.add('hidden');
+            }
+            
+            // 약물 테이블 초기화 및 첫 번째 행 추가
+            document.getElementById('medicationTableBody').innerHTML = '';
+            addMedicationRow();
+            
+            // 진단명 테이블 초기화 및 첫 번째 행 추가
+            document.getElementById('diagnosisTableBody').innerHTML = '';
+            addDiagnosisRow();
+            
+            // 처방전 폼 표시
+            document.getElementById('prescriptionForm').classList.remove('hidden');
+            prescriptionSaved = false;
+            
+            // 진료 완료 버튼 비활성화
+            const completeBtn = document.getElementById('completeBtn');
+            completeBtn.disabled = true;
+            completeBtn.style.backgroundColor = '#6c757d';
+            completeBtn.style.cursor = 'not-allowed';
+        }
+
+        // 기존 처방전 확인
+        async function checkExistingPrescription(receptionId) {
+            try {
+                const response = await fetch(`/api/doctor/prescriptions/reception/${receptionId}`);
+                if (response.ok) {
+                    const prescription = await response.json();
+                    // 기존 처방전으로 폼 채우기
+                    fillPrescriptionForm(prescription);
+                    prescriptionSaved = true;
+                    document.getElementById('completeBtn').disabled = false;
+                    showAlert('기존 처방전이 로드되었습니다.', 'success');
+                }
+            } catch (error) {
+                // 처방전이 없는 경우는 정상 상황
+                console.log('처방전 없음 - 새로 작성');
+            }
+        }
+        
+        // 바이탈사인 정보 로드
+        async function loadVitalSignInfo(receptionId) {
+            try {
+                const response = await fetch(`/api/doctor/vital-sign/${receptionId}`);
+                if (response.ok) {
+                    const vitalSign = await response.json();
+                    displayVitalSignInfo(vitalSign);
+                } else {
+                    // 바이탈사인이 없는 경우
+                    displayVitalSignInfo(null);
+                    console.log('바이탈사인 정보 없음');
+                }
+            } catch (error) {
+                console.error('바이탈사인 로드 실패:', error);
+                displayVitalSignInfo(null);
+            }
+        }
+        
+        // 바이탈사인 정보 표시
+        function displayVitalSignInfo(vitalSign) {
+            const vitalSignInfoElement = document.getElementById('vitalSignInfo');
+            
+            if (!vitalSign || !vitalSign.id) {
+                // 바이탈사인 데이터가 없는 경우
+                vitalSignInfoElement.classList.remove('hidden');
+                
+                // 모든 필드를 "측정 안됨"으로 표시
+                document.getElementById('vitalBodyTemp').textContent = '측정 안됨';
+                document.getElementById('vitalBloodPressure').textContent = '측정 안됨';
+                document.getElementById('vitalPulse').textContent = '측정 안됨';
+                document.getElementById('vitalSymptoms').textContent = '기록 없음';
+                document.getElementById('vitalOtherSymptoms').textContent = '기록 없음';
+                document.getElementById('vitalMedicalHistory').textContent = '기록 없음';
+                document.getElementById('vitalNurseNotes').textContent = '기록 없음';
+                document.getElementById('vitalNurseId').textContent = '-';
+                
+                console.log('바이탈사인 데이터 없음 - 기본값으로 표시');
+                return;
+            }
+            
+            // 바이탈사인 데이터가 있는 경우
+            vitalSignInfoElement.classList.remove('hidden');
+            
+            // 바이탈사인 수치 표시
+            document.getElementById('vitalBodyTemp').textContent = vitalSign.bodyTemp ? `${vitalSign.bodyTemp}°C` : '-';
+            document.getElementById('vitalBloodPressure').textContent = vitalSign.bloodPressure || '-';
+            document.getElementById('vitalPulse').textContent = vitalSign.pulse ? `${vitalSign.pulse}bpm` : '-';
+            
+            // 증상 및 과거력 표시
+            document.getElementById('vitalSymptoms').textContent = vitalSign.symptoms || '-';
+            document.getElementById('vitalOtherSymptoms').textContent = vitalSign.otherSymptoms || '-';
+            document.getElementById('vitalMedicalHistory').textContent = vitalSign.medicalHistory || '-';
+            document.getElementById('vitalNurseNotes').textContent = vitalSign.nurseNotes || '-';
+            document.getElementById('vitalNurseId').textContent = vitalSign.nurseId || '-';
+            
+            // 바이탈사인 정보를 SOAP의 O(객관적 소견)에 자동 입력
+            const objectiveText = [];
+            if (vitalSign.bodyTemp) objectiveText.push(`체온: ${vitalSign.bodyTemp}°C`);
+            if (vitalSign.bloodPressure) objectiveText.push(`혈압: ${vitalSign.bloodPressure}`);
+            if (vitalSign.pulse) objectiveText.push(`맥박: ${vitalSign.pulse}bpm`);
+            
+            // 기존 객관적 소견에 바이탈사인 추가
+            const existingObjective = document.getElementById('objective').value;
+            const combinedObjective = objectiveText.length > 0 
+                ? (existingObjective ? `${existingObjective}\n\n[바이탈사인]\n${objectiveText.join(', ')}` : `[바이탈사인]\n${objectiveText.join(', ')}`)
+                : existingObjective;
+            
+            document.getElementById('objective').value = combinedObjective;
+        }
+
+        // 처방전 폼 채우기 (EMR 형식)
+        function fillPrescriptionForm(prescription) {
+            // 진단명 설정
+            if (prescription.diagnosis) {
+                document.getElementById('diagnosisSearch').value = prescription.diagnosis;
+                document.getElementById('finalDiagnosis').value = prescription.diagnosis;
+                
+                // 진단명 테이블 초기화
+                document.getElementById('diagnosisTableBody').innerHTML = '';
+                
+                // 진단명을 쉼표로 분리하여 테이블에 추가
+                const diagnosisNames = prescription.diagnosis.split(',').map(d => d.trim());
+                diagnosisNames.forEach(diagnosisName => {
+                    if (diagnosisName) {
+                        addDiagnosisRow();
+                        const lastRow = document.querySelector('#diagnosisTableBody tr:last-child');
+                        if (lastRow) {
+                            lastRow.querySelector('input[name="diagnosisName[]"]').value = diagnosisName;
+                            
+                            // 상병코드 자동 찾기
+                            const diagnosisItem = diagnosisData.find(item => 
+                                item.diagnosis === diagnosisName
+                            );
+                            if (diagnosisItem) {
+                                lastRow.querySelector('input[name="diagnosisCode[]"]').value = diagnosisItem.code;
+                            }
+                        }
+                    }
+                });
+                
+                // 테이블이 비어있으면 하나 추가
+                if (document.querySelectorAll('#diagnosisTableBody tr').length === 0) {
+                    addDiagnosisRow();
+                }
+            }
+            
+            // SOAP 정보 설정
+            document.getElementById('subjective').value = prescription.symptoms || '';
+            
+            // 치료 계획에서 SOAP 정보 분리
+            if (prescription.treatmentPlan) {
+                const lines = prescription.treatmentPlan.split('\n');
+                lines.forEach(line => {
+                    if (line.startsWith('O: ')) {
+                        document.getElementById('objective').value = line.substring(3);
+                    } else if (line.startsWith('A: ')) {
+                        document.getElementById('assessment').value = line.substring(3);
+                    } else if (line.startsWith('P: ')) {
+                        document.getElementById('plan').value = line.substring(3);
+                    }
+                });
+            }
+            
+            // 복약지도 및 의사 소견
+            document.getElementById('medicationGuidance').value = prescription.dosageInstructions || '';
+            document.getElementById('doctorNotes').value = prescription.notes || '';
+            
+            // 약물 처방 파싱 (간단한 형태로)
+            if (prescription.medications) {
+                const medicationLines = prescription.medications.split('\n');
+                document.getElementById('medicationTableBody').innerHTML = '';
+                
+                medicationLines.forEach(line => {
+                    if (line.trim()) {
+                        addMedicationRow();
+                        const lastRow = document.querySelector('#medicationTableBody tr:last-child');
+                        if (lastRow) {
+                            lastRow.querySelector('input[name="medicationName[]"]').value = line.trim();
+                        }
+                    }
+                });
+            }
+            
+            // 재진 날짜
+            if (prescription.followUpDate) {
+                document.getElementById('customFollowUpDate').value = new Date(prescription.followUpDate).toISOString().slice(0, 16);
+                document.getElementById('followUpDate').value = 'custom';
+                document.getElementById('customFollowUpDate').classList.remove('hidden');
+            }
+        }
+
+        // 처방전 저장
+        async function savePrescription() {
+            try {
+                const formData = new FormData(document.getElementById('prescriptionFormData'));
+                
+                // 재진 날짜 계산
+                let followUpDate = null;
+                const followUpSelection = formData.get('followUpDate');
+                
+                if (followUpSelection === 'custom') {
+                    const customDate = formData.get('customFollowUpDate');
+                    if (customDate) {
+                        followUpDate = new Date(customDate).toISOString();
+                    }
+                } else if (followUpSelection) {
+                    const now = new Date();
+                    switch (followUpSelection) {
+                        case '3days':
+                            now.setDate(now.getDate() + 3);
+                            break;
+                        case '1week':
+                            now.setDate(now.getDate() + 7);
+                            break;
+                        case '2weeks':
+                            now.setDate(now.getDate() + 14);
+                            break;
+                        case '1month':
+                            now.setMonth(now.getMonth() + 1);
+                            break;
+                        case '2months':
+                            now.setMonth(now.getMonth() + 2);
+                            break;
+                        case '3months':
+                            now.setMonth(now.getMonth() + 3);
+                            break;
+                    }
+                    // 기본적으로 오전 10시로 설정
+                    now.setHours(10, 0, 0, 0);
+                    followUpDate = now.toISOString();
+                }
+                
+                // 약물 처방 데이터 수집
+                const medications = collectMedicationData();
+                const medicationText = medications.map(med => {
+                    let text = `${med.name}`;
+                    if (med.dosage) text += ` ${med.dosage}`;
+                    if (med.frequency) text += ` - ${med.frequency}`;
+                    if (med.days) text += `, ${med.days}일분`;
+                    if (med.instructions) text += `, ${med.instructions}`;
+                    if (med.coverage) text += ` (${med.coverage})`;
+                    return text;
+                }).join('\n');
+
+                // 진단명 데이터 수집
+                const diagnoses = collectDiagnosisData();
+                const diagnosisText = diagnoses.map(diag => diag.name).join(', ');
+
+                const prescriptionData = {
+                    receptionId: parseInt(formData.get('receptionId')),
+                    diagnosis: diagnosisText || formData.get('diagnosis') || document.getElementById('finalDiagnosis').value,
+                    symptoms: formData.get('subjective') || '', // SOAP의 S
+                    treatmentPlan: [
+                        formData.get('objective') ? `O: ${formData.get('objective')}` : '',
+                        formData.get('assessment') ? `A: ${formData.get('assessment')}` : '',
+                        formData.get('plan') ? `P: ${formData.get('plan')}` : ''
+                    ].filter(Boolean).join('\n'),
+                    medications: medicationText || '처방 없음',
+                    dosageInstructions: formData.get('medicationGuidance') || '',
+                    notes: formData.get('doctorNotes') || '',
+                    followUpDate: followUpDate
+                };
+
+                console.log('처방전 저장 데이터:', prescriptionData);
+                console.log('currentReception:', currentReception);
+
+                // 필수 필드 검증
+                if (!prescriptionData.diagnosis || prescriptionData.diagnosis.trim() === '') {
+                    showAlert('진단명은 필수 입력 사항입니다.', 'error');
+                    return;
+                }
+
+                // receptionId 검증
+                if (!prescriptionData.receptionId || isNaN(prescriptionData.receptionId)) {
+                    console.error('receptionId가 유효하지 않습니다:', prescriptionData.receptionId);
+                    
+                    // currentReception에서 receptionId 가져오기 시도
+                    if (currentReception && currentReception.id) {
+                        prescriptionData.receptionId = currentReception.id;
+                        console.log('currentReception에서 receptionId 설정:', prescriptionData.receptionId);
+                    } else {
+                        showAlert('환자 정보를 다시 선택해주세요.', 'error');
+                        return;
+                    }
+                }
+
+                const response = await fetch('/api/doctor/prescriptions', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(prescriptionData)
+                });
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('처방전 저장 실패 응답:', errorText);
+                    
+                    let errorMessage = '처방전 저장 실패';
+                    try {
+                        const errorJson = JSON.parse(errorText);
+                        errorMessage = errorJson.message || errorMessage;
+                    } catch (e) {
+                        errorMessage = errorText || errorMessage;
+                    }
+                    
+                    throw new Error(errorMessage);
+                }
+
+                const result = await response.json();
+                prescriptionSaved = true;
+                const completeBtn = document.getElementById('completeBtn');
+                if (completeBtn) {
+                    completeBtn.disabled = false;
+                    completeBtn.style.backgroundColor = '#28a745';
+                    completeBtn.style.cursor = 'pointer';
+                }
+                console.log('처방전 저장 완료 - 진료 완료 버튼 활성화됨');
+                showAlert('처방전이 저장되었습니다.', 'success');
+            } catch (error) {
+                console.error('처방전 저장 실패:', error);
+                showAlert('처방전 저장에 실패했습니다. ' + error.message, 'error');
+            }
+        }
+
+        // 처방전 미리보기
+        function previewPrescription() {
+            const formData = new FormData(document.getElementById('prescriptionFormData'));
+            
+            // 재진 날짜 텍스트 생성
+            let followUpText = '해당 없음';
+            const followUpSelection = formData.get('followUpDate');
+            
+            if (followUpSelection === 'custom') {
+                const customDate = formData.get('customFollowUpDate');
+                if (customDate) {
+                    followUpText = new Date(customDate).toLocaleDateString('ko-KR', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric'
+                    });
+                }
+            } else if (followUpSelection) {
+                const followUpLabels = {
+                    '3days': '3일 후',
+                    '1week': '1주일 후',
+                    '2weeks': '2주일 후',
+                    '1month': '1개월 후',
+                    '2months': '2개월 후',
+                    '3months': '3개월 후'
+                };
+                followUpText = followUpLabels[followUpSelection] || '해당 없음';
+            }
+            
+            // 기본 정보 설정
+            document.getElementById('prescriptionDate').textContent = new Date().toLocaleDateString('ko-KR', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            });
+            
+            // 환자 정보 설정
+            if (currentPatient) {
+                document.getElementById('previewPatientName').textContent = currentPatient.name;
+                document.getElementById('previewPatientBirth').textContent = currentPatient.birthDate;
+            }
+            
+            // 진단명 설정 (진단명 테이블에서 가져오기)
+            const diagnoses = collectDiagnosisData();
+            const diagnosisValue = diagnoses.length > 0 ? 
+                                 diagnoses.map(diag => diag.name).join(', ') :
+                                 formData.get('diagnosis') || 
+                                 document.getElementById('finalDiagnosis').value || 
+                                 document.getElementById('diagnosisSearch').value || 
+                                 '진단명 미입력';
+            document.getElementById('previewDiagnosis').textContent = diagnosisValue;
+            
+            // 의사 소견 설정
+            const notesValue = formData.get('doctorNotes') || '특이사항 없음';
+            document.getElementById('previewNotes').textContent = notesValue;
+            
+            // 재진 예정일 설정
+            document.getElementById('previewFollowUp').textContent = followUpText;
+            
+            // 처방 약물 테이블 생성
+            const medicationTableBody = document.getElementById('previewMedicationTableBody');
+            const medications = collectMedicationData();
+            
+            if (medications.length === 0) {
+                medicationTableBody.innerHTML = `
+                    <tr>
+                        <td colspan="4" style="text-align: center; color: #666; font-style: italic;">
+                            처방된 약물이 없습니다.
+                        </td>
+                    </tr>
+                `;
+            } else {
+                medicationTableBody.innerHTML = medications.map(med => `
+                    <tr>
+                        <td>${med.name || '약물명 미입력'}</td>
+                        <td>${med.dosage || '용량 미입력'} - ${med.frequency || '복용횟수 미입력'}</td>
+                        <td>${med.days || '0'}일분</td>
+                        <td>${med.instructions || ''} ${med.coverage ? '(' + med.coverage + ')' : ''}</td>
+                    </tr>
+                `).join('');
+            }
+            
+            document.getElementById('prescriptionPreview').classList.remove('hidden');
+        }
+
+        // 진료 완료 버튼 핸들러
+        function handleCompleteReception() {
+            console.log('진료 완료 버튼 핸들러 호출됨');
+            completeReception();
+        }
+
+        // 진료 완료
+        async function completeReception() {
+            console.log('진료 완료 함수 시작');
+            console.log('prescriptionSaved:', prescriptionSaved);
+            console.log('currentPatient:', currentPatient);
+            console.log('currentReception:', currentReception);
+            
+            if (!currentReception) {
+                console.error('currentReception이 null입니다.');
+                showAlert('선택된 환자가 없습니다.', 'error');
+                return;
+            }
+            
+            if (!prescriptionSaved) {
+                console.warn('처방전이 저장되지 않았습니다.');
+                showAlert('처방전을 먼저 저장해주세요.', 'warning');
+                return;
+            }
+
+            if (!confirm('진료를 완료하시겠습니까?')) {
+                console.log('사용자가 진료 완료를 취소했습니다.');
+                return;
+            }
+
+            try {
+                const receptionId = currentReception.id;
+                console.log('진료 완료 API 호출:', `/api/doctor/complete/${receptionId}`);
+                
+                const response = await fetch(`/api/doctor/complete/${receptionId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                console.log('API 응답 상태:', response.status);
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('API 오류 응답:', errorText);
+                    let errorMessage = '진료 완료 처리 실패';
+                    try {
+                        const errorJson = JSON.parse(errorText);
+                        errorMessage = errorJson.message || errorMessage;
+                    } catch (e) {
+                        // JSON 파싱 실패 시 원본 텍스트 사용
+                        errorMessage = errorText;
+                    }
+                    throw new Error(errorMessage);
+                }
+
+                const result = await response.json();
+                console.log('진료 완료 성공:', result);
+                
+                showAlert('진료가 완료되었습니다. 처방전이 간호사에게 전달되었습니다.', 'success');
+                
+                // 폼 초기화
+                resetForm();
+                
+                // 대기열 새로고침
+                loadWaitingQueue();
+                loadCurrentPatients();
+            } catch (error) {
+                console.error('진료 완료 실패:', error);
+                showAlert('진료 완료 처리에 실패했습니다. ' + error.message, 'error');
+            }
+        }
+
+        // 폼 초기화
+        function resetForm() {
+            console.log('폼 초기화 시작');
+            
+            // 환자 정보 숨기기
+            document.getElementById('patientInfo').classList.add('hidden');
+            document.getElementById('prescriptionForm').classList.add('hidden');
+            document.getElementById('prescriptionPreview').classList.add('hidden');
+            document.getElementById('vitalSignInfo').classList.add('hidden');
+            document.getElementById('surveyInfo').classList.add('hidden');
+            
+            // 빈 상태 표시
+            document.getElementById('emptyState').classList.remove('hidden');
+            
+            // 폼 데이터 초기화
+            document.getElementById('prescriptionFormData').reset();
+            
+            // 약물 테이블 초기화
+            document.getElementById('medicationTableBody').innerHTML = '';
+            
+            // 진단명 테이블 초기화
+            document.getElementById('diagnosisTableBody').innerHTML = '';
+            
+            // 전역 변수 초기화
+            currentPatient = null;
+            currentReception = null;
+            prescriptionSaved = false;
+            
+            // 진료 완료 버튼 비활성화
+            const completeBtn = document.getElementById('completeBtn');
+            if (completeBtn) {
+                completeBtn.disabled = true;
+                completeBtn.style.backgroundColor = '#6c757d';
+                completeBtn.style.cursor = 'not-allowed';
+            }
+            
+            console.log('폼 초기화 완료');
+        }
+
+        // 알림 메시지 표시
+        function showAlert(message, type) {
+            const alertDiv = document.getElementById('alertMessage');
+            alertDiv.className = `alert alert-${type}`;
+            alertDiv.textContent = message;
+            alertDiv.classList.remove('hidden');
+            
+            setTimeout(() => {
+                alertDiv.classList.add('hidden');
+            }, 5000);
+        }
+
+        // ========== 암호 확인 함수 ==========
+        
+        // 암호 확인
+        function checkPassword() {
+            const password = document.getElementById('passwordInput').value;
+            const errorDiv = document.getElementById('passwordError');
+            
+            // 의사 페이지 암호 (실제 운영에서는 더 안전한 방법 사용)
+            const correctPassword = 'doctor123';
+            
+            if (password === correctPassword) {
+                // 암호 맞음 - 메인 컨텐츠 표시
+                document.getElementById('passwordOverlay').style.display = 'none';
+                document.querySelector('.main-content-wrapper').style.display = 'block';
+                
+                // 데이터 로드 시작
+                loadWaitingQueue();
+                loadCurrentPatients();
+            } else {
+                // 암호 틀림
+                errorDiv.textContent = '암호가 올바르지 않습니다.';
+                document.getElementById('passwordInput').value = '';
+                document.getElementById('passwordInput').focus();
+                
+                // 에러 메시지 3초 후 자동 삭제
+                setTimeout(() => {
+                    errorDiv.textContent = '';
+                }, 3000);
+            }
+        }
+        
+        // 엔터키로 암호 확인
+        document.getElementById('passwordInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                checkPassword();
+            }
+        });
+
+    </script>
+    </div> <!-- main-content-wrapper 끝 -->
+</body>
+</html> 
