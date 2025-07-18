@@ -1264,8 +1264,8 @@
                         <h3 style="margin-bottom: 1rem; color: #333;">🔔 자동 SMS 알림 규칙</h3>
                         <div class="sms-info" style="background: #e7f3ff; padding: 1.5rem; border-radius: 8px; border-left: 4px solid #2196f3;">
                             <ul style="margin-left: 1.5rem; line-height: 1.6; color: #1976d2;">
-                                <li>대기 환자가 <strong>3명 이상</strong>일 때 SMS 알림이 발송됩니다.</li>
-                                <li><strong>3번째 환자부터</strong> "2팀 전 알림"을 받습니다.</li>
+                                <li>대기 환자가 <strong>있을 때</strong> SMS 알림이 발송됩니다.</li>
+                                <li>아래 설정한 <strong>발송 시점</strong>에 따라 알림을 받습니다.</li>
                                 <li>환자 접수 확인 시 또는 의사 호출 시 자동으로 체크됩니다.</li>
                                 <li>전화번호가 없거나 알림을 거부한 환자는 제외됩니다.</li>
                                 <li>현재 설정된 모드에 따라 실제 발송 또는 시뮬레이션이 실행됩니다.</li>
@@ -1280,18 +1280,18 @@
                             <div class="current-setting" style="margin-bottom: 1rem;">
                                 <h4 style="margin-bottom: 0.5rem; color: #333;">현재 설정</h4>
                                 <div id="currentNotifyTimingDisplay" style="font-size: 1.2rem; font-weight: bold; color: #28a745;">
-                                    앞 대기자가 2명 남았을 때 알림 발송
+                                    대기 순번 2번째일 때 알림 발송 (앞에 1명)
                                 </div>
                             </div>
                             
                             <div class="setting-controls" style="display: flex; gap: 1rem; align-items: center; margin-bottom: 1rem;">
-                                <label for="notifyTiming" style="color: #333; font-weight: 500;">앞 대기자가</label>
+                                <label for="notifyTiming" style="color: #333; font-weight: 500;">대기 순번</label>
                                 <select id="notifyTiming" style="padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
-                                    <option value="1">1명 남았을 때</option>
-                                    <option value="2" selected>2명 남았을 때</option>
-                                    <option value="3">3명 남았을 때</option>
-                                    <option value="4">4명 남았을 때</option>
-                                    <option value="5">5명 남았을 때</option>
+                                    <option value="1">바로 다음 차례 (1번째)</option>
+                                    <option value="2" selected>앞에 1명 있을 때 (2번째)</option>
+                                    <option value="3">앞에 2명 있을 때 (3번째)</option>
+                                    <option value="4">앞에 3명 있을 때 (4번째)</option>
+                                    <option value="5">앞에 4명 있을 때 (5번째)</option>
                                 </select>
                                 <span style="color: #666;">알림 발송</span>
                                 <button id="updateNotifyTimingBtn" class="btn btn-success" onclick="updateNotifyTiming()">
@@ -1317,18 +1317,10 @@
     <!-- Chart.js 라이브러리 -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
-        // API URL을 동적으로 설정 (휴대폰 접속 시 네트워크 IP 사용)
+        // API URL을 동적으로 설정
         function getApiBaseUrl() {
-            const hostname = window.location.hostname;
-            const port = '8081';
-            
-            if (hostname === 'localhost' || hostname === '127.0.0.1') {
-                // localhost 접속 시 실제 네트워크 IP 사용
-                return 'http://192.168.70.26:8081/api';
-            } else {
-                // 실제 호스트명으로 접속 시 그대로 사용
-                return `http://${hostname}:${port}/api`;
-            }
+            // 실제 서버 IP로 고정
+            return 'http://192.168.70.26:8081/api';
         }
         
         const API_BASE_URL = getApiBaseUrl();
@@ -1339,7 +1331,7 @@
         let isConnected = false;
 
         function connectWebSocket() {
-            const socket = new SockJS(`${API_BASE_URL.replace('/api', '')}/ws`);
+            const socket = new SockJS('http://192.168.70.26:8081/ws');
             stompClient = Stomp.over(socket);
             
             stompClient.connect({}, function(frame) {
@@ -1494,14 +1486,6 @@
                     }
                     document.getElementById('pendingCount').textContent = receptions.length;
                     renderReceptions('pending', receptions);
-                    
-                    // 대기 인원 변경 시 SMS 알림 설정 업데이트
-                    const pendingCount = receptions.filter(r => r.status === 'pending').length;
-                    updateManualNotifyRadios(pendingCount);
-                    if (pendingCount < 3) {
-                        document.getElementById('manualNotifyYes').checked = false;
-                        document.getElementById('manualNotifyNo').checked = true;
-                    }
                 })
                 .catch(error => {
                     console.error('대기 중 접수 로드 실패:', error);
@@ -1580,9 +1564,7 @@
                         <div class="detail-item">
                             <strong>접수자:</strong> ${reception.isGuardian ? '보호자' : '본인'}
                         </div>
-                        <div class="detail-item">
-                            <strong>알림:</strong> ${reception.notifyAt ? `${reception.notifyAt}명 남았을 때` : '없음'}
-                        </div>
+
                         <div class="detail-item">
                             <strong>상태:</strong> <span class="status-badge status-${type}">${getStatusText(reception.status)}</span>
                         </div>
@@ -1596,9 +1578,17 @@
                                 🗑️ 삭제
                             </button>
                         ` : `
+                            <div style="display: flex; gap: 0.5rem; align-items: center;">
+                                <label style="font-size: 0.9rem; margin: 0;">
+                                    <input type="checkbox" ${reception.smsNotificationEnabled ? 'checked' : ''} 
+                                           onchange="toggleSmsNotification(${reception.id}, this.checked)" 
+                                           style="margin-right: 0.3rem;">
+                                    SMS 알림
+                                </label>
                             <button class="btn btn-danger" onclick="deleteReception(${reception.id}, '${reception.patientName}')" style="font-size: 0.8rem;">
                                 🗑️ 삭제
                             </button>
+                            </div>
                         `}
                     </div>
                 </div>
@@ -1627,6 +1617,33 @@
             .catch(error => {
                 console.error('접수 확인 실패:', error);
                 alert('접수 확인에 실패했습니다.');
+            });
+        }
+
+        // SMS 알림 설정 토글
+        function toggleSmsNotification(receptionId, enabled) {
+            fetch(`${API_BASE_URL}/nurse/reception/${receptionId}/sms`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ enabled: enabled })
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('SMS 설정 업데이트 실패');
+                }
+                return response.json();
+            })
+            .then(result => {
+                console.log('SMS 설정 업데이트 성공:', result);
+                // 성공 시 특별한 알림 없이 조용히 처리
+            })
+            .catch(error => {
+                console.error('SMS 설정 업데이트 실패:', error);
+                alert('SMS 설정 업데이트에 실패했습니다.');
+                // 실패 시 체크박스 상태 되돌리기
+                event.target.checked = !enabled;
             });
         }
 
@@ -1709,8 +1726,10 @@
                 document.getElementById('manualName').value = '';
                 document.getElementById('manualBirthDate').value = '';
                 document.getElementById('manualPhone').value = '';
-                document.getElementById('manualNotify').value = '';
                 document.getElementById('manualSymptoms').value = '';
+                // SMS 알림 설정 초기화
+                document.getElementById('manualNotifyYes').checked = false;
+                document.getElementById('manualNotifyNo').checked = true;
                 clearExistingPatientInfo();
                 currentSelectedPatient = null;
                 loadData(); // 데이터 새로고침
@@ -1996,7 +2015,7 @@
             if (prescriptions.length === 0) {
                 container.innerHTML = `
                     <div class="empty-state">
-                        <h3>�� 출력 대기 중인 처방전이 없습니다</h3>
+                        <h3>출력 대기 중인 처방전이 없습니다</h3>
                         <p>모든 처방전이 출력되었습니다.</p>
                     </div>
                 `;
@@ -2958,16 +2977,11 @@
         // SMS 테스트 발송
         function sendTestSms() {
             const phoneNumber = document.getElementById('testPhoneNumber').value;
-            const message = document.getElementById('testMessage').value;
+            const patientName = document.getElementById('testMessage').value || '테스트 환자';
             const resultDiv = document.getElementById('testSmsResult');
 
             if (!phoneNumber) {
                 showTestResult('전화번호를 입력해주세요.', 'error');
-                return;
-            }
-
-            if (!message) {
-                showTestResult('메시지를 입력해주세요.', 'error');
                 return;
             }
 
@@ -2978,24 +2992,26 @@
                 return;
             }
 
-            const formData = new FormData();
-            formData.append('phoneNumber', phoneNumber);
-            formData.append('message', message);
-
             showTestResult('SMS 발송 중...', 'info');
 
             fetch(`${API_BASE_URL}/nurse/test-sms`, {
                 method: 'POST',
-                body: formData
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    phoneNumber: phoneNumber,
+                    patientName: patientName
+                })
             })
-            .then(response => response.text())
+            .then(response => response.json())
             .then(result => {
-                if (result.includes('성공')) {
-                    showTestResult(result, 'success');
+                if (result.success) {
+                    showTestResult(result.message, 'success');
                     document.getElementById('testPhoneNumber').value = '';
                     document.getElementById('testMessage').value = '';
                 } else {
-                    showTestResult('SMS 발송 실패: ' + result, 'error');
+                    showTestResult(result.message, 'error');
                 }
             })
             .catch(error => {
@@ -3224,78 +3240,85 @@
             document.querySelectorAll('input[name="history"]').forEach(cb => cb.checked = false);
         }
         
-        // 대기 인원에 따라 알림 체크박스 활성/비활성 처리 함수
+        // 대기 인원에 따라 알림 체크박스 상태 업데이트 함수
         function updateManualNotifyRadios(waitingCount) {
             const yesRadio = document.getElementById('manualNotifyYes');
             const noRadio = document.getElementById('manualNotifyNo');
             const notifyInfo = document.getElementById('manualNotifyInfo');
-            if (waitingCount >= 3) {
+            
+            console.log('대기자 수 업데이트:', waitingCount);
+            
+            // 기본값은 항상 "알림 받지 않기"
+            yesRadio.checked = false;
+            noRadio.checked = true;
+            
+            // 대기 인원에 따른 선택 가능 여부 설정
+            if (waitingCount >= 2) {
+                // 2명 이상일 때만 선택 가능
                 yesRadio.disabled = false;
                 noRadio.disabled = false;
-                notifyInfo.textContent = '';
-                // 이전 선택 유지, 없으면 '알림 받지 않기'가 아닌 상태로 둠
+                notifyInfo.textContent = `현재 진료 대기 인원 ${waitingCount}명 - SMS 알림 발송 가능`;
+                notifyInfo.style.color = '#28a745';
             } else {
-                yesRadio.checked = false;
+                // 2명 미만일 때는 선택 불가, "알림 받지 않기"로 고정
                 yesRadio.disabled = true;
-                noRadio.checked = true;
                 noRadio.disabled = true;
-                notifyInfo.textContent = '대기 인원이 3명 이상일 때만 SMS 알림 신청이 가능합니다.';
+                yesRadio.checked = false;
+                noRadio.checked = true;
+                notifyInfo.textContent = `현재 진료 대기 인원 ${waitingCount}명 - 2명 이상일 때만 SMS 알림 발송 가능`;
+                notifyInfo.style.color = '#6c757d';
             }
         }
 
         // 수기 접수 폼이 열릴 때 대기 인원 fetch 후 체크박스 상태 업데이트
         function openManualRegisterForm() {
-            fetch(`${API_BASE_URL}/nurse/pending`)
+            fetch(`${API_BASE_URL}/patient/waiting-count`)
                 .then(res => res.json())
-                .then(data => {
-                    // status가 'pending'인 환자만 카운트
-                    const pendingCount = Array.isArray(data) ? data.filter(r => r.status === 'pending').length : 0;
-                    updateManualNotifyRadios(pendingCount);
-                    if (pendingCount < 3) {
-                        document.getElementById('manualNotifyYes').checked = false;
-                        document.getElementById('manualNotifyNo').checked = true;
-                    }
+                .then(waitingCount => {
+                    updateManualNotifyRadios(waitingCount);
                     // ... 기존 폼 초기화 코드 ...
+                })
+                .catch(error => {
+                    console.error('대기자 수 조회 실패:', error);
+                    updateManualNotifyRadios(0); // 에러 시 기본값으로 처리
                 });
         }
 
         // 일반 환자 접수 폼이 열릴 때 대기 인원 fetch 후 체크박스 상태 업데이트
         function openGeneralRegisterForm() {
-            fetch(`${API_BASE_URL}/nurse/pending`)
+            fetch(`${API_BASE_URL}/patient/waiting-count`)
                 .then(res => res.json())
-                .then(data => {
-                    // status가 'pending'인 환자만 카운트
-                    const pendingCount = Array.isArray(data) ? data.filter(r => r.status === 'pending').length : 0;
-                    updateManualNotifyRadios(pendingCount);
-                    if (pendingCount < 3) {
-                        document.getElementById('manualNotifyYes').checked = false;
-                        document.getElementById('manualNotifyNo').checked = true;
-                    }
+                .then(waitingCount => {
+                    updateManualNotifyRadios(waitingCount);
+                })
+                .catch(error => {
+                    console.error('대기자 수 조회 실패:', error);
+                    updateManualNotifyRadios(0); // 에러 시 기본값으로 처리
                 });
         }
 
 
 
-        // 일반 환자 접수 폼이 열릴 때 대기 인원 fetch 후 체크박스 상태 업데이트
-        function openGeneralRegisterForm() {
-            fetch(`${API_BASE_URL}/nurse/pending`)
-                .then(res => res.json())
-                .then(data => {
-                    // status가 'pending'인 환자만 카운트
-                    const pendingCount = Array.isArray(data) ? data.filter(r => r.status === 'pending').length : 0;
-                    updateGeneralNotifyRadios(pendingCount);
-                });
-        }
+
 
         // ========== SMS 관련 함수들 ==========
 
         // SMS 알림 발송 시점 설정 로드
         function loadNotifyTimingSettings() {
-            const savedTiming = localStorage.getItem('notifyTiming');
-            const timing = savedTiming ? parseInt(savedTiming) : 2; // 기본값 2명
-            
+            // 서버에서 현재 설정 불러오기
+            fetch(`${API_BASE_URL}/nurse/sms-timing`)
+                .then(response => response.json())
+                .then(timing => {
             document.getElementById('notifyTiming').value = timing;
             updateNotifyTimingDisplay(timing);
+                })
+                .catch(error => {
+                    console.error('SMS 알림 발송 시점 설정 로드 실패:', error);
+                    // 실패 시 기본값 사용
+                    const timing = 2;
+                    document.getElementById('notifyTiming').value = timing;
+                    updateNotifyTimingDisplay(timing);
+                });
         }
         
         // SMS 알림 발송 시점 설정 업데이트
@@ -3307,18 +3330,38 @@
                 return;
             }
             
-            // 로컬 스토리지에 저장
-            localStorage.setItem('notifyTiming', timing);
-            
+            // 서버에 설정 저장
+            fetch(`${API_BASE_URL}/nurse/sms-timing`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: `timing=${timing}`
+            })
+            .then(response => response.text())
+            .then(message => {
             // 화면 업데이트
             updateNotifyTimingDisplay(timing);
-            
-            alert(`SMS 알림 발송 시점이 "앞 대기자가 ${timing}명 남았을 때"로 설정되었습니다.`);
+                alert(message);
+                
+                // 접수 목록 새로고침 (변경된 설정 반영)
+                loadReceptions();
+            })
+            .catch(error => {
+                console.error('SMS 알림 발송 시점 설정 실패:', error);
+                alert('설정 변경에 실패했습니다. 다시 시도해주세요.');
+            });
         }
         
         // SMS 알림 발송 시점 표시 업데이트
         function updateNotifyTimingDisplay(timing) {
-            document.getElementById('currentNotifyTimingDisplay').textContent = `앞 대기자가 ${timing}명 남았을 때 알림 발송`;
+            let displayText;
+            if (timing === 1) {
+                displayText = '바로 다음 차례일 때 알림 발송';
+            } else {
+                displayText = `앞 대기자가 ${timing - 1}명 남았을 때 알림 발송 (${timing}번째 순서)`;
+            }
+            document.getElementById('currentNotifyTimingDisplay').textContent = displayText;
         }
 
         // JS: showExistingPatientInfo 함수 하단에 추가
@@ -3393,6 +3436,8 @@
             document.getElementById('existingPatientBasicInfo').style.display = 'flex';
             document.getElementById('editPatientForm').style.display = 'none';
         }
+
+
     </script>
     </div> <!-- main-content 끝 -->
 </body>

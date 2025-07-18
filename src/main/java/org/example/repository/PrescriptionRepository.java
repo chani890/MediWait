@@ -21,6 +21,9 @@ public interface PrescriptionRepository extends JpaRepository<Prescription, Long
     @Query("SELECT p FROM Prescription p WHERE p.reception.id = :receptionId")
     Optional<Prescription> findByReceptionId(@Param("receptionId") Long receptionId);
     
+    // 접수 ID로 처방전 삭제
+    void deleteByReceptionId(Long receptionId);
+    
     // 상태별 처방전 조회 (생성 시간 오름차순)
     List<Prescription> findByStatusOrderByCreatedAtAsc(Prescription.PrescriptionStatus status);
     

@@ -67,7 +67,7 @@ public class PatientController {
             log.info("Step 3: Getting patient info");
             if (reception.getPatient() == null) {
                 log.error("Patient is null for reception ID: {}", receptionId);
-                throw new RuntimeException("Patient data is missing");
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
             }
             log.info("Step 4: Patient found: {}", reception.getPatient().getName());
 
@@ -85,10 +85,12 @@ public class PatientController {
             response.put("patientName", reception.getPatient().getName());
             response.put("phoneNumber", reception.getPatient().getPhoneNumber());
             response.put("createdAt", reception.getCreatedAt());
+            response.put("confirmedAt", reception.getConfirmedAt());
             response.put("status", reception.getStatus());
             response.put("waitingPosition", waitingPosition);
             response.put("totalWaiting", totalWaiting);
-            response.put("notifyEnabled", reception.getNotifyEnabled() != null ? reception.getNotifyEnabled() : false);
+            response.put("smsNotificationEnabled", reception.getSmsNotificationEnabled());
+            response.put("smsSent", reception.getSmsSent());
 
             log.info("Step 10: Response built successfully");
             return ResponseEntity.ok(response);

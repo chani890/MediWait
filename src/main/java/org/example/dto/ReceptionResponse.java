@@ -18,6 +18,7 @@ public class ReceptionResponse {
     private String phoneNumber;
     private ReceptionStatus status;
     private Boolean isGuardian;
+    private Boolean notifyEnabled; // SMS 알림 활성화 여부
     private Integer notifyAt;
     private LocalDateTime createdAt;
     private LocalDateTime confirmedAt;

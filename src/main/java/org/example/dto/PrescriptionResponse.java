@@ -18,6 +18,7 @@ public class PrescriptionResponse {
     private Long receptionId;
     private String patientName;
     private String patientPhoneNumber;
+    private String patientBirthDate; // 환자 생년월일
     private String diagnosis; // 진단명
     private String symptoms; // 증상
     private String treatmentPlan; // 치료 계획

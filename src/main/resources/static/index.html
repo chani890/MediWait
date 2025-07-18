@@ -130,6 +130,8 @@
             border: 2px solid #e9ecef;
             transition: all 0.3s ease;
             cursor: pointer;
+            position: relative;
+            z-index: 1;
         }
 
         .radio-item:hover {
@@ -143,6 +145,9 @@
             width: 16px;
             height: 16px;
             accent-color: #667eea;
+            cursor: pointer;
+            position: relative;
+            z-index: 2;
         }
 
         .radio-item label {
@@ -386,29 +391,13 @@
             </div>
 
             <div class="form-group">
-                <label>SMS 알림 설정</label>
+                <label>SMS 알림 안내</label>
                 <div id="smsNotificationSection">
-                    <div class="radio-group">
-                        <div class="radio-item">
-                            <input type="radio" id="notifyEnabled" name="notifyEnabled" value="true">
-                            <label for="notifyEnabled">SMS 알림 받기</label>
+                    <div id="smsInfo" style="color: #666; font-size: 0.9rem; margin-top: 0.5rem; padding: 1rem; background: #f8f9fa; border-radius: 5px; border-left: 4px solid #007bff;">
+                        <i class="fas fa-info-circle"></i> 현재 대기 인원: <span id="waitingCount">-</span>명 (2명 이상일 때 SMS 알림 발송)
+                        <div style="margin-top: 0.5rem; font-size: 0.85rem; color: #666;">
+                            앞에 1명 남았을 때 자동으로 SMS 알림이 발송됩니다.
                         </div>
-                        <div class="radio-item">
-                            <input type="radio" id="notifyDisabled" name="notifyEnabled" value="false" checked>
-                            <label for="notifyDisabled">SMS 알림 받지 않기</label>
-                        </div>
-                    </div>
-                    <div id="notifyAtSection" style="margin-top: 1rem; display: none;">
-                        <label for="notifyAt">몇 명 남았을 때 알림을 받으시겠습니까?</label>
-                        <select id="notifyAt" name="notifyAt" style="width: 100%; padding: 0.5rem; margin-top: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
-                            <option value="2">2명 남았을 때</option>
-                            <option value="3">3명 남았을 때</option>
-                            <option value="4">4명 남았을 때</option>
-                            <option value="5">5명 남았을 때</option>
-                        </select>
-                    </div>
-                    <div id="smsNotAvailable" style="display: none; color: #888; font-size: 0.9rem; margin-top: 0.5rem;">
-                        현재 대기 인원이 3명 미만이므로 SMS 알림을 받을 수 없습니다.
                     </div>
                 </div>
             </div>
@@ -455,18 +444,10 @@
     </div>
 
     <script>
-        // API URL을 동적으로 설정 (휴대폰 접속 시 네트워크 IP 사용)
+        // API URL을 동적으로 설정
         function getApiBaseUrl() {
-            const hostname = window.location.hostname;
-            const port = '8081';
-            
-            if (hostname === 'localhost' || hostname === '127.0.0.1') {
-                // localhost 접속 시 실제 네트워크 IP 사용
-                return 'http://192.168.70.26:8081/api';
-            } else {
-                // 실제 호스트명으로 접속 시 그대로 사용
-                return `http://${hostname}:${port}/api`;
-            }
+            // 실제 서버 IP로 고정
+            return 'http://192.168.70.26:8081/api';
         }
         
         const API_BASE_URL = getApiBaseUrl();
@@ -477,7 +458,7 @@
         let isConnected = false;
 
         function connectWebSocket() {
-            const socket = new SockJS(`${API_BASE_URL.replace('/api', '')}/ws`);
+            const socket = new SockJS('http://192.168.70.26:8081/ws');
             stompClient = Stomp.over(socket);
             
             stompClient.connect({}, function(frame) {
@@ -523,21 +504,13 @@
                 input.addEventListener('blur', checkExistingPatient);
             });
             
-            // SMS 알림 라디오 버튼 이벤트 리스너
+            // SMS 알림 라디오 버튼 이벤트 리스너 (디버깅용)
             document.getElementById('notifyEnabled').addEventListener('change', function() {
-                const notifyAtSection = document.getElementById('notifyAtSection');
-                if (this.checked) {
-                    notifyAtSection.style.display = 'block';
-                } else {
-                    notifyAtSection.style.display = 'none';
-                }
+                console.log('알림 받기 선택됨:', this.checked);
             });
             
             document.getElementById('notifyDisabled').addEventListener('change', function() {
-                const notifyAtSection = document.getElementById('notifyAtSection');
-                if (this.checked) {
-                    notifyAtSection.style.display = 'none';
-                }
+                console.log('알림 받지 않기 선택됨:', this.checked);
             });
             
             // 폴백: 30초마다 대기 인원 업데이트 (WebSocket 연결 실패 시)
@@ -562,46 +535,20 @@
                 });
         }
 
-        // SMS 알림 옵션 업데이트 (현재 대기 인원에 따라)
+        // 대기 인원에 따라 SMS 알림 설정 업데이트
         function updateSmsNotificationOptions(waitingCount) {
-            const notifyEnabledRadio = document.getElementById('notifyEnabled');
-            const notifyDisabledRadio = document.getElementById('notifyDisabled');
-            const notifyAtSection = document.getElementById('notifyAtSection');
-            const smsNotAvailable = document.getElementById('smsNotAvailable');
+            const smsInfo = document.getElementById('smsInfo');
             
-            if (waitingCount >= 3) {
-                // 3명 이상일 때: 알림 받기 선택 가능
-                notifyEnabledRadio.disabled = false;
-                notifyDisabledRadio.disabled = false;
-                smsNotAvailable.style.display = 'none';
-                
-                // 알림 받기 선택 시 notifyAt 섹션 표시
-                if (notifyEnabledRadio.checked) {
-                    notifyAtSection.style.display = 'block';
-                }
+            console.log('대기 인원 업데이트:', waitingCount, '명');
+            
+            // 대기 인원에 따른 정보 표시
+            if (waitingCount >= 1) {
+                smsInfo.innerHTML = `현재 대기 인원: <span id="waitingCount">${waitingCount}</span>명 - 대기 순서에 따라 SMS 알림이 자동으로 발송됩니다`;
+                smsInfo.style.color = '#28a745';
             } else {
-                // 3명 미만일 때: 알림 받지 않기로 강제 설정
-                notifyEnabledRadio.disabled = true;
-                notifyDisabledRadio.disabled = true;
-                notifyDisabledRadio.checked = true;
-                notifyAtSection.style.display = 'none';
-                smsNotAvailable.style.display = 'block';
+                smsInfo.innerHTML = `현재 대기 인원: <span id="waitingCount">${waitingCount}</span>명 - 대기자가 있을 때 SMS 알림 발송`;
+                smsInfo.style.color = '#6c757d';
             }
-            
-            // notifyAt 옵션 업데이트
-            const notifySelect = document.getElementById('notifyAt');
-            const options = notifySelect.querySelectorAll('option');
-            
-            options.forEach(option => {
-                const notifyValue = parseInt(option.value);
-                if (notifyValue > waitingCount) {
-                    option.disabled = true;
-                    option.textContent = option.textContent.replace(' (설정 불가)', '') + ' (설정 불가)';
-                } else {
-                    option.disabled = false;
-                    option.textContent = option.textContent.replace(' (설정 불가)', '');
-                }
-            });
         }
 
         // 기존 환자 확인 (실제로는 서버에서 확인해야 함)
@@ -641,8 +588,8 @@
                 birthDate: formData.get('birthDate'),
                 phoneNumber: formData.get('phoneNumber'),
                 isGuardian: formData.get('isGuardian') === 'true',
-                notifyEnabled: formData.get('notifyEnabled') === 'true',
-                notifyAt: formData.get('notifyEnabled') === 'true' ? parseInt(formData.get('notifyAt')) : null,
+                notifyEnabled: true, // 기본값으로 SMS 알림 활성화
+                notifyAt: 2, // 앞에 1명 있을 때 (2번째 순서)
                 symptoms: formData.get('symptoms') || null,
                 allergies: formData.get('allergies') || null,
                 medications: formData.get('medications') || null,

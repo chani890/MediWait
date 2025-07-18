@@ -253,6 +253,33 @@
             color: #666;
         }
 
+        .notification-info {
+            display: flex;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .notification-info span {
+            font-weight: 500;
+            color: #333;
+        }
+
+        .notification-detail {
+            display: flex;
+            align-items: center;
+            font-size: 0.85rem;
+            color: #666;
+            background: rgba(255, 255, 255, 0.7);
+            padding: 8px 12px;
+            border-radius: 5px;
+            margin-top: 8px;
+        }
+
+        .notification-detail i {
+            margin-right: 6px;
+            font-size: 0.8rem;
+        }
+
         .loading {
             text-align: center;
             padding: 40px;
@@ -379,10 +406,13 @@
             <div class="notification-section">
                 <div class="notification-title">
                     <i class="fas fa-bell"></i>
-                    알림 설정
+                    SMS 알림 설정
                 </div>
                 <div class="notification-message" id="notificationStatus">
-                    호출 시 SMS로 알림을 받습니다.
+                    <div class="notification-info">
+                        <i class="fas fa-info-circle"></i>
+                        <span>알림 설정 정보를 불러오는 중...</span>
+                    </div>
                 </div>
             </div>
 
@@ -409,18 +439,10 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
     
     <script>
-        // API URL을 동적으로 설정 (휴대폰 접속 시 네트워크 IP 사용)
+        // API URL을 동적으로 설정
         function getApiBaseUrl() {
-            const hostname = window.location.hostname;
-            const port = '8081';
-            
-            if (hostname === 'localhost' || hostname === '127.0.0.1') {
-                // localhost 접속 시 실제 네트워크 IP 사용
-                return 'http://192.168.70.26:8081';
-            } else {
-                // 실제 호스트명으로 접속 시 그대로 사용
-                return `http://${hostname}:${port}`;
-            }
+            // 실제 서버 IP로 고정
+            return 'http://192.168.70.26:8081';
         }
         
         const API_BASE_URL = getApiBaseUrl();
@@ -435,7 +457,7 @@
 
         // WebSocket 연결
         function connectWebSocket() {
-            const socket = new SockJS(`${API_BASE_URL}/ws`);
+            const socket = new SockJS('http://192.168.70.26:8081/ws');
             stompClient = Stomp.over(socket);
             
             stompClient.connect({}, function(frame) {
@@ -628,18 +650,63 @@
         // 알림 상태 업데이트
         function updateNotificationStatus(data) {
             const notificationDiv = document.getElementById('notificationStatus');
-            if (data.notifyEnabled) {
+            const waitingPosition = data.waitingPosition || 0;
+            const totalWaiting = data.totalWaiting || 0;
+            
+            // SMS 알림 활성화 여부 확인 (새로운 필드명 사용)
+            const smsEnabled = data.smsNotificationEnabled || false;
+            
+            if (smsEnabled) {
+                let notifyMessage = '';
+                let statusIcon = '';
+                let statusColor = '';
+                
+                if (totalWaiting < 2) {
+                    // 대기 인원이 2명 미만일 때
+                    statusIcon = 'fas fa-info-circle';
+                    statusColor = '#f39c12';
+                    notifyMessage = 'SMS 알림 비활성화 (대기 인원 2명 미만)';
+                } else if (waitingPosition === 2) {
+                    // 2번째 대기자일 때
+                    statusIcon = 'fas fa-bell';
+                    statusColor = '#e74c3c';
+                    notifyMessage = 'SMS 알림 발송 대상 (앞에 1명 남음)';
+                } else if (waitingPosition === 1) {
+                    // 1번째 대기자일 때
+                    statusIcon = 'fas fa-clock';
+                    statusColor = '#0984e3';
+                    notifyMessage = '다음 차례입니다';
+                } else {
+                    // 3번째 이후 대기자일 때
+                    statusIcon = 'fas fa-clock';
+                    statusColor = '#0984e3';
+                    notifyMessage = '대기 중입니다';
+                }
+                
                 notificationDiv.innerHTML = `
-                    <i class="fas fa-check-circle" style="color: #00b894; margin-right: 8px;"></i>
-                    호출 시 SMS로 알림을 받습니다. (${data.phoneNumber || ''})
+                    <div class="notification-info">
+                        <i class="${statusIcon}" style="color: ${statusColor}; margin-right: 8px;"></i>
+                        <span>${notifyMessage}</span>
+                    </div>
+                    <div class="notification-detail" style="margin-top: 8px; font-size: 0.85rem; color: #666;">
+                        <i class="fas fa-cog"></i>
+                        설정: 대기순서 2번째일 때 SMS 알림 발송
+                    </div>
                 `;
             } else {
                 notificationDiv.innerHTML = `
-                    <i class="fas fa-times-circle" style="color: #e74c3c; margin-right: 8px;"></i>
-                    SMS 알림이 비활성화되어 있습니다.
+                    <div class="notification-info">
+                        <i class="fas fa-times-circle" style="color: #e74c3c; margin-right: 8px;"></i>
+                        <span>SMS 알림이 비활성화되어 있습니다.</span>
+                    </div>
+                    <div class="notification-detail" style="margin-top: 8px; font-size: 0.85rem; color: #666;">
+                        <i class="fas fa-info-circle"></i>
+                        간호사에게 SMS 알림 활성화를 요청하세요
+                    </div>
                 `;
             }
         }
+
 
         // 입장 메시지 표시
         function showWelcomeMessage() {

@@ -877,10 +877,6 @@
                                 <span class="info-label">전화번호:</span>
                                 <span class="info-value" id="patientPhone">-</span>
                             </div>
-                            <div class="info-item">
-                                <span class="info-label">접수시간:</span>
-                                <span class="info-value" id="receptionTime">-</span>
-                            </div>
                         </div>
                         
                         <!-- 문진표 정보 -->
@@ -1068,7 +1064,7 @@
                             <div class="form-row">
                                 <div class="form-group" style="position: relative; z-index: 999;">
                                     <label for="medicationSearch">약물 검색</label>
-                                    <input type="text" id="medicationSearch" placeholder="약물명이나 증상을 입력하세요 (예: 타이레놀, 발열, 두통)" autocomplete="off">
+                                    <input type="text" id="medicationSearch" placeholder="약물명이나 증상을 입력하세요 (예: 발열, 두통)" autocomplete="off">
                                     <div id="medicationDropdown" class="medication-dropdown"></div>
                                 </div>
                             </div>
@@ -1212,7 +1208,7 @@
                         <div class="prescription-footer">
                             <div class="doctor-info">
                                 <p><strong>처방의사:</strong> 강찬희 (면허번호: 12345)</p>
-                                <p><strong>의료기관:</strong> 컴공 의원</p>
+                                <p><strong>의료기관:</strong> 서대 병원</p>
                             </div>
                             <div class="prescription-note">
                                 <p>※ 의약품 복용 시 주의사항을 반드시 확인하시기 바랍니다.</p>
@@ -1299,53 +1295,124 @@
             { diagnosis: "급성 중이염", searchTerms: ["중이염", "귀", "귀통증"], code: "H66.9" }
         ];
 
+        // 진단명-처방 조합 매핑 데이터
+        const diagnosisPrescriptionMapping = {
+            "급성 비인두염": ["클로페라스틴", "암브록솔", "푸라콜", "라베프라졸", "아목사실린"],
+            "급성 인두염": ["클로페라스틴", "암브록솔", "푸라콜", "라베프라졸", "아목사실린"],
+            "급성 편도염": ["클로페라스틴", "암브록솔", "푸라콜", "라베프라졸", "아목사실린"],
+            "급성 기관지염": ["엘도스", "세파클러", "트라마돌", "라베프라졸"],
+            "알레르기 비염": ["클로페라스틴", "레보세티리진", "암브록솔"],
+            "부비동염": ["클래리스로마이신", "세파클러", "라베프라졸"],
+            "천식": ["엘도스", "클로페라스틴", "레보세티리진"],
+            "급성 위장염": ["라베프라졸", "세픽심", "암브록솔"],
+            "기능성 소화불량": ["가스모틴", "무사프리드", "알마게이트"],
+            "위염": ["에소메프라졸", "알마게이트", "가스모틴"],
+            "역류성 식도염": ["에소메프라졸", "알마게이트", "가스모틴"],
+            "제2형 당뇨병": ["메트포르민", "글리메피리드", "시타글립틴"],
+            "고지혈증": ["아토르바스타틴", "에제티미브"],
+            "갑상선 기능저하증": ["레보티록신", "티록사신"],
+            "갑상선 기능항진증": ["메티마졸", "프로프라놀롤"],
+            "고혈압": ["암로디핀", "로사르탄", "히드로클로로티아지드"],
+            "편두통": ["플루나리진", "이소메트헤프텐 복합제", "아미트리프틸린"],
+            "긴장성 두통": ["플루나리진", "이소메트헤프텐 복합제", "아미트리프틸린"],
+            "어지럼증": ["베타히스틴", "라베프라졸", "디멘히드리네이트"],
+            "불면증": ["졸피뎀", "트리아졸람"],
+            "우울증": ["에스시탈로프람", "로라제팜"],
+            "불안장애": ["에스시탈로프람", "로라제팜"],
+            "요통": ["트라마돌", "덱시부프로펜", "세레콕시브", "라베프라졸"],
+            "목 통증": ["트라마돌", "덱시부프로펜", "세레콕시브", "라베프라졸"],
+            "무릎 관절염": ["트라마돌", "덱시부프로펜", "세레콕시브", "라베프라졸"],
+            "어깨통증": ["트라마돌", "덱시부프로펜", "세레콕시브", "라베프라졸"],
+            "테니스엘보": ["트라마돌", "덱시부프로펜", "세레콕시브", "라베프라졸"],
+            "대상포진": ["하이드로코르티손 연고", "퓨시드산 연고", "무피로신 연고"],
+            "단순포진": ["하이드로코르티손 연고", "퓨시드산 연고", "무피로신 연고"],
+            "알레르기성 피부염": ["클로페라스틴", "레보세티리진", "암브록솔"],
+            "두드러기": ["하이드로코르티손 연고", "퓨시드산 연고", "무피로신 연고"],
+            "무좀": ["하이드로코르티손 연고", "퓨시드산 연고", "무피로신 연고"],
+            "급성 장염": ["라베프라졸", "세픽심", "암브록솔"],
+            "바이러스성 감염": ["아목사실린", "클래리스로마이신", "푸라콜"],
+            "발열": ["푸라콜", "암브록솔", "라베프라졸"],
+            "급성 중이염": ["클래리스로마이신", "세파클러", "라베프라졸"]
+        };
+
         // 약물 데이터 (실제 의원에서 자주 사용되는 기준)
         const medicationData = [
-            // 감기 / 호흡기
-            { name: "타이레놀", ingredient: "아세트아미노펜", dosage: "500mg", frequency: "1일 3회", symptoms: ["발열", "두통", "몸살", "해열", "진통"], category: "감기/호흡기" },
-            { name: "이부프로펜", ingredient: "이부프로펜", dosage: "200mg", frequency: "1일 3회", symptoms: ["두통", "치통", "관절통", "염증", "해열"], category: "진통/소염" },
-            { name: "세티리진", ingredient: "세티리진염산염", dosage: "10mg", frequency: "1일 1회", symptoms: ["알레르기", "비염", "재채기", "콧물", "가려움"], category: "알레르기" },
-            { name: "로라타딘", ingredient: "로라타딘", dosage: "10mg", frequency: "1일 1회", symptoms: ["콧물", "코막힘", "피부가려움", "알레르기"], category: "알레르기" },
+    // 감기 / 호흡기
             { name: "클로페라스틴", ingredient: "클로페라스틴염산염", dosage: "10mg", frequency: "1일 3회", symptoms: ["마른기침", "기침"], category: "감기/호흡기" },
             { name: "암브록솔", ingredient: "암브록솔염산염", dosage: "30mg", frequency: "1일 3회", symptoms: ["가래", "기침완화", "거담"], category: "감기/호흡기" },
             { name: "엘도스", ingredient: "에르도스테인", dosage: "300mg", frequency: "1일 2회", symptoms: ["진한가래", "인후염", "거담"], category: "감기/호흡기" },
-            { name: "푸라콜", ingredient: "복합제", dosage: "용량고정", frequency: "1일 3회", symptoms: ["종합감기", "해열", "진통", "기침"], category: "감기/호흡기" },
+            { name: "푸라콜", ingredient: "복합제", dosage: "1정", frequency: "1일 3회", symptoms: ["종합감기", "해열", "진통", "기침"], category: "감기/호흡기" },
+
+            { name: "이소메트헤프텐 복합제", ingredient: "이소메트헤프텐 + 카페인 + 아세트아미노펜", dosage: "1정", frequency: "두통 시 1~2정", symptoms: ["편두통", "혈관성 두통"], category: "진통/신경" },
+            { name: "플루나리진", ingredient: "플루나리진염산염", dosage: "5mg", frequency: "1일 1회", symptoms: ["편두통 예방"], category: "신경과" },
+            { name: "아미트리프틸린", ingredient: "아미트리프틸린염산염", dosage: "10~25mg", frequency: "1일 1회", symptoms: ["긴장성 두통", "신경통"], category: "신경과" },
+            { name: "베타히스틴", ingredient: "베타히스틴디하이드로클로라이드", dosage: "8mg", frequency: "1일 3회", symptoms: ["어지럼증", "이명"], category: "신경과" },
+            { name: "디멘히드리네이트", ingredient: "디멘히드리네이트", dosage: "50mg", frequency: "1일 3회", symptoms: ["현기증", "멀미"], category: "신경과" },
+
+    // 불면증 관련 (향정)
+            { name: "졸피뎀", ingredient: "졸피뎀타르타르산염", dosage: "5~10mg", frequency: "취침 전", symptoms: ["불면증"], category: "정신과/수면" },
+            { name: "트리아졸람", ingredient: "트리아졸람", dosage: "0.25mg", frequency: "취침 전", symptoms: ["불면증"], category: "정신과/수면" },
+
+    // 불안/우울 (향정)
+            { name: "에스시탈로프람", ingredient: "에스시탈로프람옥살산염", dosage: "10mg", frequency: "1일 1회", symptoms: ["우울증", "불안"], category: "정신과" },
+            { name: "로라제팜", ingredient: "로라제팜", dosage: "0.5~1mg", frequency: "1일 2~3회 필요시", symptoms: ["불안", "공황"], category: "정신과" }, 
             
-            // 위장약 / 소화제
+    // 위장약 / 소화제
             { name: "가스모틴", ingredient: "모사프리드", dosage: "5mg", frequency: "1일 3회", symptoms: ["소화불량", "위정체감", "속쓰림"], category: "위장약" },
             { name: "무사프리드", ingredient: "무사프리드시트르산염", dosage: "5mg", frequency: "1일 3회", symptoms: ["소화불량"], category: "위장약" },
-            { name: "라베프라졸", ingredient: "라베프라졸나트륨", dosage: "10-20mg", frequency: "1일 1회", symptoms: ["위염", "식도염", "속쓰림", "위산역류"], category: "위장약" },
+            { name: "라베프라졸", ingredient: "라베프라졸나트륨", dosage: "10mg", frequency: "1일 1회", symptoms: ["위염", "식도염", "속쓰림", "위산역류"], category: "위장약" },
             { name: "에소메프라졸", ingredient: "에소메프라졸마그네슘", dosage: "20mg", frequency: "1일 1회", symptoms: ["위산역류", "위염"], category: "위장약" },
             { name: "알마게이트", ingredient: "알마게이트", dosage: "15ml", frequency: "1일 3회 식후", symptoms: ["위산과다", "속쓰림"], category: "위장약" },
-            { name: "겔포스", ingredient: "알루미늄/마그네슘 혼합", dosage: "15ml", frequency: "1일 3회", symptoms: ["제산작용", "속쓰림"], category: "위장약" },
-            { name: "훼스탈", ingredient: "복합 소화효소", dosage: "1-2정", frequency: "식후", symptoms: ["소화불량", "과식"], category: "위장약" },
-            
-            // 통증 / 근골격계
+
+    // 통증 / 근골격계
             { name: "덱시부프로펜", ingredient: "덱시부프로펜", dosage: "300mg", frequency: "1일 3회", symptoms: ["근육통", "요통"], category: "진통/소염" },
-            { name: "트라마돌", ingredient: "트라마돌염산염", dosage: "50-100mg", frequency: "1일 2-3회", symptoms: ["신경통", "디스크통증"], category: "진통/소염" },
-            { name: "세레콕시브", ingredient: "세레콕시브", dosage: "200mg", frequency: "1일 1-2회", symptoms: ["관절염", "류마티즘"], category: "진통/소염" },
-            { name: "로렉신정", ingredient: "록소프로펜", dosage: "60mg", frequency: "1일 3회", symptoms: ["급성근육통", "염좌"], category: "진통/소염" },
-            
-            // 항생제 (감염 시)
+            { name: "트라마돌", ingredient: "트라마돌염산염", dosage: "50mg", frequency: "1일 2~3회", symptoms: ["신경통", "디스크통증"], category: "진통/소염" },
+            { name: "세레콕시브", ingredient: "세레콕시브", dosage: "200mg", frequency: "1일 1~2회", symptoms: ["관절염", "류마티즘"], category: "진통/소염" },
+            { name: "로렉신정", ingredient: "록소프로펜나트륨", dosage: "60mg", frequency: "1일 3회", symptoms: ["급성근육통", "염좌"], category: "진통/소염" },
+
+    // 항생제
             { name: "아목사실린", ingredient: "아목시실린", dosage: "500mg", frequency: "1일 3회", symptoms: ["인후염", "편도염"], category: "항생제" },
-            { name: "클래리스로마이신", ingredient: "클래리스로마이신", dosage: "250-500mg", frequency: "1일 2회", symptoms: ["기관지염", "폐렴"], category: "항생제" },
-            { name: "세파클러", ingredient: "세팔로스포린계", dosage: "250mg", frequency: "1일 3회", symptoms: ["중이염", "축농증"], category: "항생제" },
-            { name: "세픽심", ingredient: "세픽심", dosage: "100-200mg", frequency: "1일 2회", symptoms: ["요로감염", "상기도감염"], category: "항생제" },
+            { name: "클래리스로마이신", ingredient: "클래리스로마이신", dosage: "250mg", frequency: "1일 2회", symptoms: ["기관지염", "폐렴"], category: "항생제" },
+            { name: "세파클러", ingredient: "세파클러", dosage: "250mg", frequency: "1일 3회", symptoms: ["중이염", "축농증"], category: "항생제" },
+            { name: "세픽심", ingredient: "세픽심", dosage: "100mg", frequency: "1일 2회", symptoms: ["요로감염", "상기도감염"], category: "항생제" },
             { name: "레보플록사신", ingredient: "레보플록사신", dosage: "500mg", frequency: "1일 1회", symptoms: ["폐렴", "방광염"], category: "항생제" },
-            
-            // 알레르기 / 피부 질환
-            { name: "레보세티리진", ingredient: "레보세티리진", dosage: "5mg", frequency: "1일 1회", symptoms: ["비염", "아토피"], category: "알레르기" },
-            { name: "하이드로코르티손 연고", ingredient: "하이드로코르티손", dosage: "적량", frequency: "1일 1-2회 도포", symptoms: ["습진", "피부염"], category: "외용제" },
-            { name: "퓨시드산 연고", ingredient: "퓨시드산", dosage: "적량", frequency: "국소도포 1일 2-3회", symptoms: ["상처", "염증"], category: "외용제" },
-            { name: "무피로신 연고", ingredient: "무피로신", dosage: "적량", frequency: "국소도포 1일 2-3회", symptoms: ["세균감염", "피부질환"], category: "외용제" }
+
+    // 알레르기 / 피부
+            { name: "레보세티리진", ingredient: "레보세티리진염산염", dosage: "5mg", frequency: "1일 1회", symptoms: ["비염", "아토피"], category: "알레르기" },
+            { name: "하이드로코르티손 연고", ingredient: "하이드로코르티손", dosage: "적량", frequency: "1일 1~2회 도포", symptoms: ["습진", "피부염"], category: "외용제" },
+            { name: "퓨시드산 연고", ingredient: "퓨시드산", dosage: "적량", frequency: "1일 2~3회 국소도포", symptoms: ["상처", "염증"], category: "외용제" },
+            { name: "무피로신 연고", ingredient: "무피로신", dosage: "적량", frequency: "1일 2~3회 국소도포", symptoms: ["세균감염", "피부질환"], category: "외용제" },
+        
+            // 당뇨병
+            { name: "메트포르민", ingredient: "메트포르민염산염", dosage: "500mg", frequency: "1일 2~3회", symptoms: ["혈당조절"], category: "내분비" },
+            { name: "글리메피리드", ingredient: "글리메피리드", dosage: "1~4mg", frequency: "1일 1회", symptoms: ["혈당조절"], category: "내분비" },
+            { name: "시타글립틴", ingredient: "시타글립틴", dosage: "100mg", frequency: "1일 1회", symptoms: ["혈당조절"], category: "내분비" },
+
+    // 고지혈증
+            { name: "아토르바스타틴", ingredient: "아토르바스타틴칼슘", dosage: "10~20mg", frequency: "1일 1회", symptoms: ["콜레스테롤 조절"], category: "순환기" },
+            { name: "에제티미브", ingredient: "에제티미브", dosage: "10mg", frequency: "1일 1회", symptoms: ["LDL 콜레스테롤 저하"], category: "순환기" },
+
+    // 갑상선 기능저하증
+            { name: "레보티록신", ingredient: "레보티록신나트륨", dosage: "50~100μg", frequency: "1일 1회 공복", symptoms: ["갑상선 호르몬 보충"], category: "내분비" },
+
+    // 갑상선 기능항진증
+            { name: "메티마졸", ingredient: "메티마졸", dosage: "5~10mg", frequency: "1일 1~3회", symptoms: ["갑상선 억제"], category: "내분비" },
+            { name: "프로프라놀롤", ingredient: "프로프라놀롤염산염", dosage: "10~40mg", frequency: "1일 2~3회", symptoms: ["손떨림", "두근거림"], category: "순환기" },
+
+    // 고혈압
+            { name: "암로디핀", ingredient: "암로디핀베실산염", dosage: "5mg", frequency: "1일 1회", symptoms: ["고혈압", "혈압조절"], category: "순환기" },
+            { name: "로사르탄", ingredient: "로사르탄칼륨", dosage: "50~100mg", frequency: "1일 1회", symptoms: ["고혈압", "심장보호"], category: "순환기" },
+            { name: "히드로클로로티아지드", ingredient: "히드로클로로티아지드", dosage: "12.5mg", frequency: "1일 1회", symptoms: ["이뇨", "부종", "혈압조절"], category: "순환기" }
         ];
+
 
         // WebSocket 연결 설정
         let stompClient = null;
         let isConnected = false;
 
         function connectWebSocket() {
-            const socket = new SockJS('/ws');
+            // 동적 WebSocket URL 설정
+            const socket = new SockJS('http://192.168.70.26:8081/ws');
             stompClient = Stomp.over(socket);
             
             stompClient.connect({}, function(frame) {
@@ -1366,6 +1433,11 @@
                 
             }, function(error) {
                 console.error('WebSocket 연결 실패:', error);
+                console.error('WebSocket 오류 세부 정보:', {
+                    url: window.location.host + '/ws',
+                    protocol: window.location.protocol,
+                    error: error
+                });
                 isConnected = false;
                 
                 // 재연결 시도
@@ -1750,14 +1822,49 @@
                 return;
             }
             
-            // 새로운 행 추가
+            // 진단명 테이블에 추가
             addDiagnosisRow();
-            
-            // 마지막 행에 데이터 입력
             const lastRow = document.querySelector('#diagnosisTableBody tr:last-child');
             if (lastRow) {
-                lastRow.querySelector('input[name="diagnosisName[]"]').value = diagnosisName.trim();
-                lastRow.querySelector('input[name="diagnosisCode[]"]').value = diagnosisCode.trim();
+                lastRow.querySelector('input[name="diagnosisName[]"]').value = diagnosisName;
+                lastRow.querySelector('input[name="diagnosisCode[]"]').value = diagnosisCode;
+            }
+            
+            // 진단명에 해당하는 처방 조합이 있는지 확인
+            const prescriptionCombination = diagnosisPrescriptionMapping[diagnosisName];
+            
+            if (prescriptionCombination && prescriptionCombination.length > 0) {
+                // 처방 조합이 있는 경우 자동으로 약물 추가
+                console.log(`${diagnosisName}에 대한 처방 조합 추가:`, prescriptionCombination);
+                
+                // 기존 약물 테이블 초기화 (빈 행 제거)
+                const existingRows = document.querySelectorAll('#medicationTableBody tr');
+                existingRows.forEach(row => {
+                    const nameInput = row.querySelector('input[name="medicationName[]"]');
+                    if (!nameInput.value.trim()) {
+                        row.remove();
+                    }
+                });
+                
+                // 처방 조합에 따라 약물 자동 추가
+                prescriptionCombination.forEach(medicationName => {
+                    const medicationInfo = medicationData.find(med => med.name === medicationName);
+                    if (medicationInfo) {
+                        addMedicationFromSearch(
+                            medicationInfo.name,
+                            medicationInfo.ingredient,
+                            medicationInfo.dosage,
+                            medicationInfo.frequency,
+                            medicationInfo.category
+                        );
+                    }
+                });
+                
+                showAlert(`${diagnosisName} 진단에 대한 ${prescriptionCombination.length}개 약물이 자동으로 추가되었습니다.`, 'success');
+            } else {
+                // 처방 조합이 없는 경우 (불면증, 우울증 등)
+                console.log(`${diagnosisName}은 처방 조합이 없습니다. 기존 검색 방식을 사용하세요.`);
+                showAlert(`${diagnosisName}은 미리 정의된 처방 조합이 없습니다. 약물 검색을 통해 직접 추가해주세요.`, 'info');
             }
             
             // 검색 필드 초기화
@@ -1807,8 +1914,7 @@
                 queueContainer.innerHTML = waitingQueue.map(reception => `
                     <div class="queue-item">
                         <div>
-                            <strong>${reception.patientName}</strong><br>
-                            <small>접수시간: ${new Date(reception.createdAt).toLocaleString()}</small>
+                            <strong>${reception.patientName}</strong>
                         </div>
                         <div>
                             <span class="badge">대기중</span>
@@ -1843,13 +1949,19 @@
                 }
 
                 container.innerHTML = currentPatients.map(patient => `
-                    <div class="queue-item current" onclick="selectPatient(${patient.patientId}, ${patient.currentReceptionId})">
-                        <div>
+                    <div class="queue-item current">
+                        <div onclick="selectPatient(${patient.patientId}, ${patient.currentReceptionId})" style="cursor: pointer; flex: 1;">
                             <strong>${patient.name}</strong><br>
                             <small>호출시간: ${patient.currentReception && patient.currentReception.calledAt ? new Date(patient.currentReception.calledAt).toLocaleString() : '정보 없음'}</small>
                         </div>
-                        <div>
+                        <div style="display: flex; align-items: center; gap: 0.5rem;">
                             <span class="badge">진료중</span>
+                            <button onclick="deleteCurrentPatient(${patient.currentReceptionId}, '${patient.name}')" 
+                                    class="btn btn-danger" 
+                                    style="font-size: 0.7rem; padding: 0.2rem 0.5rem; margin-left: 0.5rem;"
+                                    title="진료 중인 환자 삭제">
+                                🗑️
+                            </button>
                         </div>
                     </div>
                 `).join('');
@@ -1860,15 +1972,33 @@
             }
         }
 
+        // 환자 호출 중복 방지를 위한 플래그
+        let isCallingPatient = false;
+
         // 다음 환자 호출
         async function callNextPatient() {
+            // 중복 호출 방지
+            if (isCallingPatient) {
+                showAlert('이미 환자를 호출하고 있습니다. 잠시 후 다시 시도해주세요.', 'warning');
+                return;
+            }
+            
+            // 호출 버튼 비활성화
+            isCallingPatient = true;
+            const callButton = document.querySelector('button[onclick="callNextPatient()"]');
+            if (callButton) {
+                callButton.disabled = true;
+                callButton.textContent = '호출 중...';
+            }
+            
             try {
                 const response = await fetch('/api/doctor/call-next', {
                     method: 'POST'
                 });
                 
                 if (!response.ok) {
-                    throw new Error('환자 호출 실패');
+                    const errorText = await response.text();
+                    throw new Error(errorText || '환자 호출 실패');
                 }
                 
                 const patientInfo = await response.json();
@@ -1877,15 +2007,28 @@
                 currentReception = patientInfo.currentReception;
                 console.log('환자 호출 후 currentReception 설정됨:', currentReception);
                 
+                // 현재 접수 ID 설정 (처방전 저장에 필요)
+                if (currentReception && currentReception.id) {
+                    patientInfo.currentReceptionId = currentReception.id;
+                }
+                
                 showPatientInfo(patientInfo);
-                showAlert('환자가 호출되었습니다.', 'success');
+                showAlert(`${patientInfo.name}님이 호출되었습니다.`, 'success');
                 
                 // 대기열과 현재 환자 목록 새로고침
                 loadWaitingQueue();
                 loadCurrentPatients();
+                
             } catch (error) {
                 console.error('환자 호출 실패:', error);
                 showAlert('환자 호출에 실패했습니다. ' + error.message, 'error');
+            } finally {
+                // 호출 완료 후 버튼 재활성화 (성공/실패 관계없이 실행)
+                isCallingPatient = false;
+                if (callButton) {
+                    callButton.disabled = false;
+                    callButton.textContent = '다음 환자 호출';
+                }
             }
         }
 
@@ -1937,25 +2080,29 @@
             document.getElementById('patientBirthDate').textContent = patientInfo.birthDate;
             document.getElementById('patientPhone').textContent = patientInfo.phoneNumber || '미등록';
             
-            if (currentReception && currentReception.createdAt) {
-                document.getElementById('receptionTime').textContent = new Date(currentReception.createdAt).toLocaleString();
-            } else {
-                document.getElementById('receptionTime').textContent = '-';
-            }
-            
             // EMR 기본 정보 표시
             document.getElementById('emrPatientName').textContent = patientInfo.name;
             document.getElementById('emrPatientBirth').textContent = patientInfo.birthDate;
             document.getElementById('emrVisitDate').textContent = new Date().toLocaleDateString('ko-KR');
             
-            // 현재 접수 ID 설정
-            const receptionId = patientInfo.currentReceptionId || (currentReception ? currentReception.id : null);
-            if (receptionId) {
-                document.getElementById('currentReceptionId').value = receptionId;
-            }
+                            // 현재 접수 ID 설정
+                const receptionId = patientInfo.currentReceptionId || (currentReception ? currentReception.id : null);
+                console.log('showPatientInfo - receptionId 설정:', {
+                    'patientInfo.currentReceptionId': patientInfo.currentReceptionId,
+                    'currentReception.id': currentReception ? currentReception.id : null,
+                    'final receptionId': receptionId
+                });
+                
+                if (receptionId) {
+                    document.getElementById('currentReceptionId').value = receptionId;
+                    console.log('currentReceptionId input 필드에 설정됨:', receptionId);
+                } else {
+                    console.warn('receptionId가 null이거나 undefined입니다.');
+                }
             
             // 문진표 정보 표시
             if (patientInfo.latestSurvey) {
+                console.log('문진표 정보 표시:', patientInfo.latestSurvey);
                 document.getElementById('surveyInfo').classList.remove('hidden');
                 document.getElementById('visitReason').textContent = patientInfo.latestSurvey.visitReason || '-';
                 document.getElementById('symptoms').textContent = patientInfo.latestSurvey.symptoms || '-';
@@ -1974,6 +2121,7 @@
                 
                 document.getElementById('subjective').value = subjectiveText.join('\n');
             } else {
+                console.log('문진표 정보 없음');
                 document.getElementById('surveyInfo').classList.add('hidden');
             }
             
@@ -1999,9 +2147,12 @@
             
             // 진료 완료 버튼 비활성화
             const completeBtn = document.getElementById('completeBtn');
-            completeBtn.disabled = true;
-            completeBtn.style.backgroundColor = '#6c757d';
-            completeBtn.style.cursor = 'not-allowed';
+            if (completeBtn) {
+                completeBtn.disabled = true;
+                completeBtn.style.backgroundColor = '#6c757d';
+                completeBtn.style.cursor = 'not-allowed';
+                completeBtn.style.opacity = '0.6';
+            }
         }
 
         // 기존 처방전 확인
@@ -2013,8 +2164,17 @@
                     // 기존 처방전으로 폼 채우기
                     fillPrescriptionForm(prescription);
                     prescriptionSaved = true;
-                    document.getElementById('completeBtn').disabled = false;
-                    showAlert('기존 처방전이 로드되었습니다.', 'success');
+                    
+                    // 진료 완료 버튼 활성화
+                    const completeBtn = document.getElementById('completeBtn');
+                    if (completeBtn) {
+                        completeBtn.disabled = false;
+                        completeBtn.style.backgroundColor = '#28a745';
+                        completeBtn.style.cursor = 'pointer';
+                        completeBtn.style.opacity = '1';
+                    }
+                    
+                    showAlert('기존 처방전이 로드되었습니다. 수정 후 다시 저장할 수 있습니다.', 'success');
                 }
             } catch (error) {
                 // 처방전이 없는 경우는 정상 상황
@@ -2176,6 +2336,13 @@
         // 처방전 저장
         async function savePrescription() {
             try {
+                // 저장 버튼 비활성화 (중복 클릭 방지)
+                const saveBtn = document.querySelector('button[onclick="savePrescription()"]');
+                if (saveBtn) {
+                    saveBtn.disabled = true;
+                    saveBtn.textContent = '저장 중...';
+                }
+                
                 const formData = new FormData(document.getElementById('prescriptionFormData'));
                 
                 // 재진 날짜 계산
@@ -2220,7 +2387,7 @@
                     let text = `${med.name}`;
                     if (med.dosage) text += ` ${med.dosage}`;
                     if (med.frequency) text += ` - ${med.frequency}`;
-                    if (med.days) text += `, ${med.days}일분`;
+                    if (med.days) text += `, ${med.days}`; // '일분' 추가하지 않음
                     if (med.instructions) text += `, ${med.instructions}`;
                     if (med.coverage) text += ` (${med.coverage})`;
                     return text;
@@ -2230,6 +2397,12 @@
                 const diagnoses = collectDiagnosisData();
                 const diagnosisText = diagnoses.map(diag => diag.name).join(', ');
 
+                console.log('처방전 저장 - FormData 검사:', {
+                    'formData.get("receptionId")': formData.get('receptionId'),
+                    'currentReceptionId input value': document.getElementById('currentReceptionId').value,
+                    'currentReception': currentReception
+                });
+                
                 const prescriptionData = {
                     receptionId: parseInt(formData.get('receptionId')),
                     diagnosis: diagnosisText || formData.get('diagnosis') || document.getElementById('finalDiagnosis').value,
@@ -2250,20 +2423,43 @@
 
                 // 필수 필드 검증
                 if (!prescriptionData.diagnosis || prescriptionData.diagnosis.trim() === '') {
-                    showAlert('진단명은 필수 입력 사항입니다.', 'error');
+                    showAlert('진단명은 필수 입력 사항입니다. 진단명을 입력해주세요.', 'error');
+                    // 진단명 입력 필드로 포커스 이동
+                    const diagnosisInput = document.getElementById('diagnosisSearch');
+                    if (diagnosisInput) {
+                        diagnosisInput.focus();
+                    }
                     return;
                 }
 
-                // receptionId 검증
+                // receptionId 검증 및 복구
                 if (!prescriptionData.receptionId || isNaN(prescriptionData.receptionId)) {
                     console.error('receptionId가 유효하지 않습니다:', prescriptionData.receptionId);
                     
-                    // currentReception에서 receptionId 가져오기 시도
+                    // 여러 방법으로 receptionId 복구 시도
+                    let recoveredReceptionId = null;
+                    
+                    // 1. currentReception에서 가져오기
                     if (currentReception && currentReception.id) {
-                        prescriptionData.receptionId = currentReception.id;
-                        console.log('currentReception에서 receptionId 설정:', prescriptionData.receptionId);
+                        recoveredReceptionId = currentReception.id;
+                        console.log('currentReception에서 receptionId 복구:', recoveredReceptionId);
+                    }
+                    
+                    // 2. hidden input 필드에서 직접 가져오기
+                    if (!recoveredReceptionId) {
+                        const hiddenInput = document.getElementById('currentReceptionId');
+                        if (hiddenInput && hiddenInput.value) {
+                            recoveredReceptionId = parseInt(hiddenInput.value);
+                            console.log('hidden input에서 receptionId 복구:', recoveredReceptionId);
+                        }
+                    }
+                    
+                    if (recoveredReceptionId && !isNaN(recoveredReceptionId)) {
+                        prescriptionData.receptionId = recoveredReceptionId;
+                        console.log('receptionId 복구 성공:', prescriptionData.receptionId);
                     } else {
-                        showAlert('환자 정보를 다시 선택해주세요.', 'error');
+                        console.error('receptionId 복구 실패 - 모든 방법 시도했지만 실패');
+                        showAlert('환자 정보를 다시 선택해주세요. (receptionId 복구 실패)', 'error');
                         return;
                     }
                 }
@@ -2293,17 +2489,29 @@
 
                 const result = await response.json();
                 prescriptionSaved = true;
+                
+                // 진료 완료 버튼 활성화
                 const completeBtn = document.getElementById('completeBtn');
                 if (completeBtn) {
                     completeBtn.disabled = false;
                     completeBtn.style.backgroundColor = '#28a745';
                     completeBtn.style.cursor = 'pointer';
+                    completeBtn.style.opacity = '1';
                 }
+                
                 console.log('처방전 저장 완료 - 진료 완료 버튼 활성화됨');
                 showAlert('처방전이 저장되었습니다.', 'success');
+                
             } catch (error) {
                 console.error('처방전 저장 실패:', error);
                 showAlert('처방전 저장에 실패했습니다. ' + error.message, 'error');
+            } finally {
+                // 저장 버튼 재활성화
+                const saveBtn = document.querySelector('button[onclick="savePrescription()"]');
+                if (saveBtn) {
+                    saveBtn.disabled = false;
+                    saveBtn.textContent = '처방전 저장';
+                }
             }
         }
 
@@ -2500,6 +2708,7 @@
                 completeBtn.disabled = true;
                 completeBtn.style.backgroundColor = '#6c757d';
                 completeBtn.style.cursor = 'not-allowed';
+                completeBtn.style.opacity = '0.6';
             }
             
             console.log('폼 초기화 완료');
@@ -2554,6 +2763,45 @@
                 checkPassword();
             }
         });
+
+        // 진료 중인 환자 삭제
+        async function deleteCurrentPatient(receptionId, patientName) {
+            const confirmation = confirm(`⚠️ 진료 중인 환자를 삭제하시겠습니까?\n\n환자명: ${patientName}\n접수 ID: ${receptionId}\n\n이 작업은 되돌릴 수 없습니다.\n진료 기록과 처방전이 모두 삭제됩니다.`);
+            
+            if (!confirmation) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/nurse/reception/${receptionId}/force`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.message || '환자 삭제 실패');
+                }
+                
+                const result = await response.json();
+                showAlert(`환자 "${patientName}"가 삭제되었습니다.`, 'success');
+                
+                // 현재 선택된 환자가 삭제된 환자인 경우 폼 초기화
+                if (currentReception && currentReception.id === receptionId) {
+                    resetForm();
+                }
+                
+                // 목록 새로고침
+                loadWaitingQueue();
+                loadCurrentPatients();
+                
+            } catch (error) {
+                console.error('환자 삭제 실패:', error);
+                showAlert('환자 삭제에 실패했습니다: ' + error.message, 'error');
+            }
+        }
 
     </script>
     </div> <!-- main-content-wrapper 끝 -->

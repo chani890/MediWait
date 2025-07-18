@@ -479,10 +479,6 @@
                         <div class="announcement-title">마스크 착용</div>
                         <div class="announcement-content">원활한 진료를 위해 마스크 착용을 부탁드립니다</div>
                     </div>
-                    <div class="announcement-item">
-                        <div class="announcement-title">대기 시간 안내</div>
-                        <div class="announcement-content">현재 평균 대기시간은 약 15분입니다</div>
-                    </div>
                 </div>
             </div>
 
@@ -497,8 +493,8 @@
                         카메라 앱으로 QR코드를 스캔하여<br>간편하게 접수하세요
                     </div>
                     <div style="margin-top: 0.5rem; font-size: 0.9rem; opacity: 0.8;">
-                        <a href="http://localhost:8081" style="color: #10b981; text-decoration: underline;">
-                            http://localhost:8081
+                                        <a href="http://192.168.70.26:8081" style="color: #10b981; text-decoration: underline;">
+                    http://192.168.70.26:8081
                         </a>
                     </div>
                 </div>
@@ -511,6 +507,7 @@
         let currentCalledPatient = null;
         let waitingList = [];
         let callMessageTimer = null; // 호출 메시지 타이머
+        let messageShownPatients = new Set(); // 이미 메시지가 표시된 환자들을 추적
 
         // Initialize the display
         document.addEventListener('DOMContentLoaded', function() {
@@ -678,12 +675,16 @@
                     // Show the most recently called patient
                     const mostRecentCall = calledPatients[calledPatients.length - 1];
                     if (mostRecentCall && mostRecentCall.name) {
-                        showCurrentCall(mostRecentCall.name);
+                        // 이미 메시지가 표시된 환자라면 무시
+                        if (!messageShownPatients.has(mostRecentCall.name)) {
+                            showCurrentCall(mostRecentCall.name);
+                        }
                     } else {
                         hideCurrentCall();
                     }
                 } else {
-                    // No patients currently called
+                    // No patients currently called - 호출된 환자가 없으면 추적 목록 초기화
+                    messageShownPatients.clear();
                     hideCurrentCall();
                 }
             } catch (error) {
@@ -694,12 +695,13 @@
 
         // Show current call
         function showCurrentCall(patientName) {
-            if (currentCalledPatient === patientName) return;
-            
             // 기존 타이머가 있으면 제거
             if (callMessageTimer) {
                 clearTimeout(callMessageTimer);
             }
+            
+            // 이 환자의 메시지가 이미 표시되었다고 추적 목록에 추가
+            messageShownPatients.add(patientName);
             
             currentCalledPatient = patientName;
             const currentCallDiv = document.getElementById('currentCall');
@@ -766,18 +768,8 @@
 
         // Generate QR Code for patient registration
         function generateQRCode() {
-            // Use the network IP address for mobile access
-            const hostname = window.location.hostname;
-            const port = window.location.port || '8081';
-            
-            // Use the actual network IP address for mobile access
-            let baseUrl;
-            if (hostname === 'localhost' || hostname === '127.0.0.1') {
-                // Use the actual network IP address instead of localhost
-                baseUrl = `http://192.168.70.26:${port}`;
-            } else {
-                baseUrl = window.location.origin;
-            }
+            // 현재 페이지의 호스트와 포트를 그대로 사용
+            const baseUrl = 'http://192.168.70.26:8081';
             
             const registrationUrl = baseUrl + '/index.html';
             
@@ -832,10 +824,7 @@
                     const callData = JSON.parse(message.body);
                     console.log('환자 호출 메시지 수신:', callData);
                     
-                    // 호출 메시지 표시
-                    showCallNotification(callData.patientName);
-                    
-                    // 대기열 데이터 새로고침
+                    // 대기열 데이터 새로고침만 수행 (메시지 표시는 loadWaitingData에서 처리)
                     setTimeout(() => {
                         loadWaitingData();
                     }, 1000);
@@ -853,93 +842,7 @@
             });
         }
 
-        function showCallNotification(patientName) {
-            // 기존 알림이 있으면 제거
-            const existingNotification = document.getElementById('callNotification');
-            if (existingNotification) {
-                existingNotification.remove();
-            }
-            
-            // 새로운 알림 생성
-            const notification = document.createElement('div');
-            notification.id = 'callNotification';
-            notification.style.cssText = `
-                position: fixed;
-                top: 50%;
-                left: 50%;
-                transform: translate(-50%, -50%);
-                background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
-                color: white;
-                padding: 30px 40px;
-                border-radius: 20px;
-                box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-                z-index: 9999;
-                text-align: center;
-                font-size: 1.8em;
-                font-weight: 700;
-                animation: fadeInScale 0.3s ease-out;
-            `;
-            
-            // 애니메이션 CSS 추가
-            const style = document.createElement('style');
-            style.textContent = `
-                @keyframes fadeInScale {
-                    0% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
-                    100% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
-                }
-                @keyframes fadeOutScale {
-                    0% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
-                    100% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
-                }
-            `;
-            document.head.appendChild(style);
-            
-            notification.innerHTML = `
-                <div style="margin-bottom: 10px;">
-                    <i class="fas fa-user-md" style="font-size: 2em; margin-bottom: 15px;"></i>
-                </div>
-                <div style="font-size: 1.2em; margin-bottom: 5px;">환자 호출</div>
-                <div style="font-size: 1.8em; font-weight: 800; color: #fff;">
-                    ${patientName}님
-                </div>
-                <div style="font-size: 1.1em; margin-top: 10px; opacity: 0.9;">
-                    진료실로 들어와주세요
-                </div>
-                <div id="callCountdown" style="font-size: 0.9em; margin-top: 15px; opacity: 0.8;">
-                    5초 후 메시지가 사라집니다
-                </div>
-            `;
-            
-            document.body.appendChild(notification);
-            
-            // 카운트다운 표시
-            let countdown = 5;
-            const countdownElement = document.getElementById('callCountdown');
-            const countdownInterval = setInterval(() => {
-                countdown--;
-                if (countdown > 0) {
-                    countdownElement.textContent = `${countdown}초 후 메시지가 사라집니다`;
-                } else {
-                    clearInterval(countdownInterval);
-                }
-            }, 1000);
-            
-            // 5초 후 알림 제거
-            setTimeout(() => {
-                clearInterval(countdownInterval);
-                if (notification) {
-                    notification.style.animation = 'fadeOutScale 0.3s ease-in';
-                    setTimeout(() => {
-                        if (notification.parentNode) {
-                            notification.parentNode.removeChild(notification);
-                        }
-                    }, 300);
-                }
-            }, 5000);
-            
-            // 알림음 재생
-            playCallSound();
-        }
+
 
         // 페이지 로드 시 WebSocket 연결
         window.addEventListener('load', function() {

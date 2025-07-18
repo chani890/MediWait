@@ -128,6 +128,33 @@ public class NurseController {
     }
     
     /**
+     * 진료 중인 환자를 포함한 접수 강제 삭제 (관리자용)
+     */
+    @DeleteMapping("/reception/{receptionId}/force")
+    public ResponseEntity<Map<String, Object>> forceDeleteReception(@PathVariable Long receptionId) {
+        log.info("접수 강제 삭제 요청: 접수 ID {}", receptionId);
+        
+        try {
+            ReceptionResponse deletedReception = receptionService.forceDeleteReception(receptionId);
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("message", "접수가 강제로 삭제되었습니다.");
+            response.put("deletedReception", deletedReception);
+            
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            log.error("접수 강제 삭제 실패: 접수 ID {}, 오류: {}", receptionId, e.getMessage());
+            
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("success", false);
+            errorResponse.put("message", e.getMessage());
+            
+            return ResponseEntity.badRequest().body(errorResponse);
+        }
+    }
+    
+    /**
      * 오늘 통계 조회
      */
     @GetMapping("/statistics/today")
@@ -178,53 +205,6 @@ public class NurseController {
         
         NurseStatisticsResponse statistics = statisticsService.getNurseStatistics(startDate, endDate);
         return ResponseEntity.ok(statistics);
-    }
-    
-    /**
-     * SMS 모드 상태 조회
-     */
-    @GetMapping("/sms-mode")
-    public ResponseEntity<Map<String, Object>> getSmsMode() {
-        Map<String, Object> response = new HashMap<>();
-        response.put("simulationMode", smsService.isSimulationMode());
-        response.put("currentMode", smsService.isSimulationMode() ? "시뮬레이션 모드" : "실제 발송 모드");
-        return ResponseEntity.ok(response);
-    }
-
-    /**
-     * SMS 모드 설정
-     */
-    @PostMapping("/sms-mode")
-    public ResponseEntity<String> setSmsMode(@RequestParam boolean simulationMode) {
-        try {
-            smsService.setSimulationMode(simulationMode);
-            String mode = simulationMode ? "시뮬레이션 모드" : "실제 발송 모드";
-            return ResponseEntity.ok("SMS 모드가 " + mode + "로 변경되었습니다.");
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body("모드 변경 실패: " + e.getMessage());
-        }
-    }
-
-    /**
-     * SMS 테스트 발송
-     */
-    @PostMapping("/test-sms")
-    public ResponseEntity<String> testSms(@RequestParam String phoneNumber, @RequestParam String message) {
-        log.info("SMS 테스트 발송 요청: {} -> {}", phoneNumber, message);
-        
-        if (!smsService.isValidPhoneNumber(phoneNumber)) {
-            return ResponseEntity.badRequest().body("유효하지 않은 전화번호입니다.");
-        }
-        
-        String formattedPhoneNumber = smsService.formatPhoneNumber(phoneNumber);
-        boolean success = smsService.sendSms(formattedPhoneNumber, message);
-        
-        String mode = smsService.isSimulationMode() ? " (시뮬레이션)" : " (실제 발송)";
-        if (success) {
-            return ResponseEntity.ok("SMS 발송 성공" + mode);
-        } else {
-            return ResponseEntity.badRequest().body("SMS 발송 실패" + mode);
-        }
     }
     
     /**
@@ -287,49 +267,6 @@ public class NurseController {
     }
     
     /**
-     * 수동 SMS 알림 발송 (대기 순서 알림)
-     */
-    @PostMapping("/send-waiting-notification")
-    public ResponseEntity<String> sendWaitingNotification(@RequestParam Long receptionId) {
-        log.info("수동 SMS 알림 발송 요청: 접수 ID {}", receptionId);
-        
-        try {
-            org.example.model.Reception reception = receptionService.findById(receptionId);
-            if (reception == null) {
-                return ResponseEntity.badRequest().body("접수를 찾을 수 없습니다.");
-            }
-            
-            if (reception.getStatus() != org.example.model.Reception.ReceptionStatus.CONFIRMED) {
-                return ResponseEntity.badRequest().body("확인된 접수만 SMS 알림을 발송할 수 있습니다.");
-            }
-            
-            String phoneNumber = reception.getPatient().getPhoneNumber();
-            if (!smsService.isValidPhoneNumber(phoneNumber)) {
-                return ResponseEntity.badRequest().body("유효하지 않은 전화번호입니다.");
-            }
-            
-            int waitingPosition = receptionService.getWaitingPosition(receptionId);
-            String formattedPhoneNumber = smsService.formatPhoneNumber(phoneNumber);
-            
-            boolean success = smsService.sendWaitingNotification(
-                formattedPhoneNumber, 
-                reception.getPatient().getName(), 
-                waitingPosition
-            );
-            
-            if (success) {
-                smsService.markAsSent(receptionId);
-                return ResponseEntity.ok("SMS 알림 발송 성공");
-            } else {
-                return ResponseEntity.badRequest().body("SMS 알림 발송 실패");
-            }
-        } catch (Exception e) {
-            log.error("SMS 알림 발송 중 오류 발생: {}", e.getMessage(), e);
-            return ResponseEntity.badRequest().body("SMS 알림 발송 중 오류가 발생했습니다.");
-        }
-    }
-
-    /**
      * 환자 정보 수정 (이름, 생년월일, 전화번호)
      */
     @PutMapping("/patient/{patientId}")
@@ -341,5 +278,137 @@ public class NurseController {
         String phoneNumber = (String) updateRequest.get("phoneNumber");
         PatientInfoResponse response = receptionService.updatePatientInfo(patientId, name, birthDateStr, phoneNumber);
         return ResponseEntity.ok(response);
+    }
+    
+    /**
+     * 접수별 SMS 알림 설정
+     */
+    @PutMapping("/reception/{receptionId}/sms")
+    public ResponseEntity<Map<String, Object>> updateSmsNotification(
+            @PathVariable Long receptionId,
+            @RequestBody Map<String, Object> request) {
+        try {
+            Boolean enabled = (Boolean) request.get("enabled");
+            receptionService.updateSmsNotification(receptionId, enabled);
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("message", "SMS 알림 설정이 업데이트되었습니다.");
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            log.error("SMS 알림 설정 업데이트 실패: {}", e.getMessage());
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", false);
+            response.put("message", "SMS 알림 설정 업데이트에 실패했습니다.");
+            return ResponseEntity.badRequest().body(response);
+        }
+    }
+    
+    /**
+     * SMS 모드 조회 (시뮬레이션 모드 vs 실제 발송 모드)
+     */
+    @GetMapping("/sms-mode")
+    public ResponseEntity<Map<String, Object>> getSmsMode() {
+        boolean simulationMode = smsService.isSimulationMode();
+        String currentMode = simulationMode 
+            ? "시뮬레이션 모드 (실제 SMS 발송 없음)" 
+            : "실제 발송 모드 (실제 SMS 발송)";
+        
+        Map<String, Object> response = new HashMap<>();
+        response.put("simulationMode", simulationMode);
+        response.put("currentMode", currentMode);
+        return ResponseEntity.ok(response);
+    }
+    
+    /**
+     * SMS 모드 설정 (시뮬레이션 모드 vs 실제 발송 모드)
+     */
+    @PostMapping("/sms-mode")
+    public ResponseEntity<String> setSmsMode(@RequestParam boolean simulationMode) {
+        smsService.setSimulationMode(simulationMode);
+        
+        String mode = simulationMode ? "시뮬레이션 모드" : "실제 발송 모드";
+        String message = String.format("SMS 발송 모드가 %s로 변경되었습니다.", mode);
+        
+        log.info("SMS 모드 변경: {}", mode);
+        return ResponseEntity.ok(message);
+    }
+    
+    /**
+     * SMS 알림 발송 시점 조회
+     */
+    @GetMapping("/sms-timing")
+    public ResponseEntity<Integer> getSmsNotifyTiming() {
+        int timing = smsService.getSmsNotifyTiming();
+        return ResponseEntity.ok(timing);
+    }
+    
+    /**
+     * SMS 알림 발송 시점 설정
+     */
+    @PostMapping("/sms-timing")
+    public ResponseEntity<String> setSmsNotifyTiming(@RequestParam int timing) {
+        if (timing < 1 || timing > 5) {
+            return ResponseEntity.badRequest().body("알림 발송 시점은 1명에서 5명 사이로 설정해주세요.");
+        }
+        
+        smsService.setSmsNotifyTiming(timing);
+        String message = String.format("SMS 알림 발송 시점이 %d번째 순서로 설정되었습니다.", timing);
+        
+        log.info("SMS 알림 발송 시점 변경: {}번째 순서", timing);
+        return ResponseEntity.ok(message);
+    }
+    
+    /**
+     * SMS 테스트 발송
+     */
+    @PostMapping("/test-sms")
+    public ResponseEntity<Map<String, Object>> sendTestSms(@RequestBody Map<String, Object> request) {
+        try {
+            String phoneNumber = (String) request.get("phoneNumber");
+            String patientName = (String) request.get("patientName");
+            
+            if (phoneNumber == null || phoneNumber.trim().isEmpty()) {
+                Map<String, Object> errorResponse = new HashMap<>();
+                errorResponse.put("success", false);
+                errorResponse.put("message", "전화번호를 입력해주세요.");
+                return ResponseEntity.badRequest().body(errorResponse);
+            }
+            
+            if (patientName == null || patientName.trim().isEmpty()) {
+                patientName = "테스트 환자";
+            }
+            
+            // 전화번호 형식 검증
+            if (!smsService.isValidPhoneNumber(phoneNumber)) {
+                Map<String, Object> errorResponse = new HashMap<>();
+                errorResponse.put("success", false);
+                errorResponse.put("message", "유효하지 않은 전화번호 형식입니다. (010-XXXX-XXXX)");
+                return ResponseEntity.badRequest().body(errorResponse);
+            }
+            
+            // SMS 발송
+            boolean smsResult = smsService.sendWaitingNotification(phoneNumber, patientName);
+            
+            Map<String, Object> response = new HashMap<>();
+            if (smsResult) {
+                response.put("success", true);
+                response.put("message", "SMS 테스트 발송이 성공했습니다.");
+                log.info("SMS 테스트 발송 성공: {} -> {}", phoneNumber, patientName);
+            } else {
+                response.put("success", false);
+                response.put("message", "SMS 테스트 발송에 실패했습니다.");
+                log.error("SMS 테스트 발송 실패: {} -> {}", phoneNumber, patientName);
+            }
+            
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            log.error("SMS 테스트 발송 중 오류 발생: {}", e.getMessage());
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("success", false);
+            errorResponse.put("message", "SMS 테스트 발송 중 오류가 발생했습니다: " + e.getMessage());
+            return ResponseEntity.badRequest().body(errorResponse);
+        }
     }
 } 

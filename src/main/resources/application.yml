@@ -47,6 +47,7 @@ spring:
 
 server:
   port: 8081
+  address: 0.0.0.0
 
 logging:
   level:
@@ -64,9 +65,9 @@ supabase:
 # SMS 설정  
 sms:
   api:
-    key: NCSNQHBDLVYQNXHX
-    secret: CXNLXOQFBZWVHXWRJXISNRJFZJUQBGIS
-    from: 01093134476
+    key: NCSQ5SXANRZTGFEP
+    secret: BFDJOB6M4HEG9TPUR3RLGJNC5U9SHJIK
+    from: 01094135930
     domain: https://api.coolsms.co.kr
     
 # WebSocket 설정

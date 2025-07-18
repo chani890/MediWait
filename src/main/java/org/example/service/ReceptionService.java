@@ -23,68 +23,59 @@ public class ReceptionService {
     private final ReceptionRepository receptionRepository;
     private final MedicalSurveyRepository medicalSurveyRepository;
     private final VitalSignRepository vitalSignRepository;
+    private final PrescriptionRepository prescriptionRepository;
     private final RealtimeNotificationService realtimeNotificationService;
-    private final SmsService smsService;
+    private final WaitingQueueService waitingQueueService;
     
     @Transactional
     public ReceptionResponse registerPatient(PatientRegistrationRequest request) {
-        // 기존 환자 확인 - 우선 이름과 생년월일로 검색
-        Optional<Patient> existingPatient = patientRepository.findByNameAndBirthDate(
-            request.getName(), request.getBirthDate());
+        log.info("환자 접수 시작: 이름={}, 전화번호={}", request.getName(), request.getPhoneNumber());
         
-        Patient patient;
-        boolean isNewPatient = false;
+        // 환자 정보 조회 또는 생성
+        Patient patient = patientRepository.findByNameAndPhoneNumber(request.getName(), request.getPhoneNumber())
+            .orElse(null);
         
-        if (existingPatient.isPresent()) {
-            patient = existingPatient.get();
-            
-            // 기존 환자의 전화번호 업데이트 (기존에 null이었고 새로 입력된 경우)
-            if (patient.getPhoneNumber() == null && 
-                request.getPhoneNumber() != null && !request.getPhoneNumber().trim().isEmpty()) {
-                patient.setPhoneNumber(request.getPhoneNumber());
-                patient = patientRepository.save(patient);
-                log.info("기존 환자 전화번호 업데이트: {}", patient.getName());
-            }
-            
-            log.info("기존 환자 접수: {}", patient.getName());
-        } else {
-            // 신규 환자 등록
+        boolean isNewPatient = (patient == null);
+        
+        if (isNewPatient) {
             patient = Patient.builder()
                 .name(request.getName())
                 .birthDate(request.getBirthDate())
-                .phoneNumber(request.getPhoneNumber() != null && !request.getPhoneNumber().trim().isEmpty() 
-                    ? request.getPhoneNumber() : null)
+                .phoneNumber(request.getPhoneNumber())
                 .build();
             patient = patientRepository.save(patient);
-            isNewPatient = true;
             log.info("신규 환자 등록: {}", patient.getName());
+        } else {
+            log.info("기존 환자 접수: {}", patient.getName());
         }
         
-        // 접수 생성
-        Reception reception = Reception.builder()
-            .patient(patient)
-            .status(Reception.ReceptionStatus.PENDING)
-            .isGuardian(request.getIsGuardian())
-            .notifyEnabled(request.getNotifyEnabled())
-            .notifyAt(request.getNotifyAt())
-            .build();
-        reception = receptionRepository.save(reception);
+        // 접수 정보 생성 (기본값 설정)
+        Reception reception = new Reception();
+        reception.setPatient(patient);
+        reception.setStatus(Reception.ReceptionStatus.PENDING);
+        reception.setIsGuardian(false); // 기본값: 본인 접수
+        reception.setSmsNotificationEnabled(true); // 기본값: SMS 알림 활성화
+        reception.setSmsSent(false);
+        reception.setCreatedAt(LocalDateTime.now());
         
-        // 신규 환자인 경우 문진표 저장
+        reception = receptionRepository.save(reception);
+        log.info("접수 등록 완료: 환자 {} (접수 ID: {})", patient.getName(), reception.getId());
+
+        // 문진표 데이터가 있으면 저장
         boolean hasSurvey = false;
-        if (isNewPatient && hasMedicalSurveyData(request)) {
+        if (request.getVisitReason() != null || request.getSymptoms() != null || request.getAllergies() != null || request.getMedications() != null || request.getMedicalHistory() != null) {
             MedicalSurvey survey = MedicalSurvey.builder()
                 .patient(patient)
                 .reception(reception)
+                .visitReason(request.getVisitReason())
                 .symptoms(request.getSymptoms())
                 .allergies(request.getAllergies())
                 .medications(request.getMedications())
                 .medicalHistory(request.getMedicalHistory())
-                .visitReason(request.getVisitReason())
                 .build();
             medicalSurveyRepository.save(survey);
             hasSurvey = true;
-            log.info("문진표 저장 완료: 환자 ID {}", patient.getId());
+            log.info("문진표 저장 완료: 환자 {} (접수 ID: {})", patient.getName(), reception.getId());
         }
         
         // 현재 대기 순번 계산
@@ -100,7 +91,6 @@ public class ReceptionService {
             .phoneNumber(patient.getPhoneNumber())
             .status(reception.getStatus())
             .isGuardian(reception.getIsGuardian())
-            .notifyAt(reception.getNotifyAt())
             .createdAt(reception.getCreatedAt())
             .waitingPosition(waitingPosition)
             .isNewPatient(isNewPatient)
@@ -126,8 +116,8 @@ public class ReceptionService {
         // 실시간 알림 전송
         realtimeNotificationService.notifyPatientStatusChange(reception.getId(), "PENDING", "CONFIRMED");
         
-        // SMS 알림 발송 로직 (2팀 전에 알림)
-        checkAndSendSmsNotifications();
+        // SMS 알림 체크 및 발송
+        waitingQueueService.checkAndSendSmsNotifications();
         
         return convertToReceptionResponse(reception);
     }
@@ -156,34 +146,67 @@ public class ReceptionService {
     
     @Transactional
     public PatientInfoResponse callNextPatient() {
-        // 확인된 환자 중 가장 먼저 확인된 환자 호출
-        List<Reception> confirmedReceptions = receptionRepository.findByStatusOrderByConfirmedAtAsc(Reception.ReceptionStatus.CONFIRMED);
+        log.info("환자 호출 요청 시작");
+        
+        // 현재 호출된 환자가 있는지 확인
+        int currentCalledCount = receptionRepository.countCalledReceptions();
+        if (currentCalledCount > 0) {
+            List<Reception> calledReceptions = receptionRepository.findCalledReceptions();
+            String currentPatientNames = calledReceptions.stream()
+                .map(r -> r.getPatient().getName())
+                .collect(java.util.stream.Collectors.joining(", "));
+            
+            log.warn("이미 호출된 환자가 있습니다: {}", currentPatientNames);
+            throw new RuntimeException("이미 호출된 환자가 있습니다: " + currentPatientNames + ". 현재 환자의 진료를 완료한 후 다음 환자를 호출해주세요.");
+        }
+        
+        // 락을 사용하여 다음 호출 가능한 환자 조회
+        List<Reception> confirmedReceptions = receptionRepository.findNextPatientToCallWithLock();
         
         if (confirmedReceptions.isEmpty()) {
+            log.warn("호출할 환자가 없습니다.");
             throw new RuntimeException("호출할 환자가 없습니다.");
         }
         
         Reception reception = confirmedReceptions.get(0);
-        reception.setStatus(Reception.ReceptionStatus.CALLED);
-        reception.setCalledAt(LocalDateTime.now());
-        reception = receptionRepository.save(reception);
+        Long receptionId = reception.getId();
+        LocalDateTime calledAt = LocalDateTime.now();
         
-        log.info("환자 호출: {} (접수 ID: {})", reception.getPatient().getName(), reception.getId());
+        // 원자적으로 상태 변경 (CONFIRMED -> CALLED)
+        int updatedRows = receptionRepository.updateStatusToCalledIfConfirmed(receptionId, calledAt);
         
-        // 호출된 환자에게 SMS 발송
-        sendCallSmsNotification(reception);
+        if (updatedRows == 0) {
+            log.warn("환자 호출 실패: 이미 호출된 환자이거나 상태가 변경됨 (접수 ID: {})", receptionId);
+            throw new RuntimeException("이미 호출된 환자이거나 상태가 변경되었습니다. 다시 시도해주세요.");
+        }
+        
+        // 업데이트된 Reception 엔티티 다시 조회
+        reception = receptionRepository.findById(receptionId)
+            .orElseThrow(() -> new RuntimeException("접수 정보를 찾을 수 없습니다."));
+        
+        log.info("환자 호출 성공: {} (접수 ID: {})", reception.getPatient().getName(), reception.getId());
         
         // 실시간 알림 전송
         realtimeNotificationService.notifyDoctorCall(reception.getId(), reception.getPatient().getName());
         
-        // 대기열 현황 페이지에 환자 호출 메시지 전송
-        realtimeNotificationService.notifyPatientCall(reception.getPatient().getName());
+        // SMS 상태 초기화 (다음 환자들의 SMS 발송을 위해)
+        waitingQueueService.resetSmsStatusForReception(reception.getId());
         
-        // 환자 호출 후 대기 순서 변경으로 인한 SMS 알림 발송
-        checkAndSendSmsNotifications();
+        // 대기열 변경으로 인한 SMS 알림 체크
+        waitingQueueService.checkAndSendSmsNotifications();
         
         // 환자 정보와 문진표, 과거 이력 조회
-        return getPatientInfo(reception.getPatient().getId());
+        PatientInfoResponse patientInfo = getPatientInfo(reception.getPatient().getId());
+        
+        // 업데이트된 접수 정보를 다시 조회하여 정확한 상태 반영
+        Reception updatedReception = receptionRepository.findById(receptionId)
+            .orElseThrow(() -> new RuntimeException("접수 정보를 찾을 수 없습니다."));
+        
+        // 호출된 접수 정보를 직접 설정 (JPA 지연 로딩 문제 해결)
+        patientInfo.setCurrentReception(convertToReceptionResponse(updatedReception));
+        patientInfo.setCurrentReceptionId(updatedReception.getId());
+        
+        return patientInfo;
     }
     
     @Transactional
@@ -195,20 +218,17 @@ public class ReceptionService {
             throw new RuntimeException("호출된 환자만 진료 완료 처리할 수 있습니다.");
         }
         
-        reception.setStatus(Reception.ReceptionStatus.DONE);
+        reception.setStatus(Reception.ReceptionStatus.COMPLETED);
         reception.setCompletedAt(LocalDateTime.now());
         reception = receptionRepository.save(reception);
         
         log.info("진료 완료: 환자 {} (접수 ID: {})", reception.getPatient().getName(), reception.getId());
         
         // 실시간 알림 전송
-        realtimeNotificationService.notifyPatientStatusChange(reception.getId(), "CALLED", "DONE");
+        realtimeNotificationService.notifyPatientStatusChange(reception.getId(), "CALLED", "COMPLETED");
         
         // 대기열 업데이트 알림 전송 (의사 화면의 현재 환자 목록 업데이트용)
         realtimeNotificationService.notifyWaitingQueueUpdate();
-        
-        // SMS 발송 기록 초기화
-        smsService.resetSentStatus(reception.getId());
         
         return convertToReceptionResponse(reception);
     }
@@ -235,7 +255,7 @@ public class ReceptionService {
             .orElseThrow(() -> new RuntimeException("접수를 찾을 수 없습니다."));
         
         // 이미 진료 완료된 접수는 삭제할 수 없음
-        if (reception.getStatus() == Reception.ReceptionStatus.DONE) {
+        if (reception.getStatus() == Reception.ReceptionStatus.COMPLETED) {
             throw new RuntimeException("이미 진료 완료된 접수는 삭제할 수 없습니다.");
         }
         
@@ -261,63 +281,103 @@ public class ReceptionService {
         // 실시간 알림 전송 (대기열 업데이트)
         realtimeNotificationService.notifyWaitingQueueUpdate();
         
-        // SMS 발송 기록 초기화
-        smsService.resetSentStatus(reception.getId());
+        return response;
+    }
+    
+    /**
+     * 진료 중인 환자를 포함한 모든 접수 강제 삭제 (관리자용)
+     */
+    @Transactional
+    public ReceptionResponse forceDeleteReception(Long receptionId) {
+        Reception reception = receptionRepository.findById(receptionId)
+            .orElseThrow(() -> new RuntimeException("접수를 찾을 수 없습니다."));
+        
+        // 이미 진료 완료된 접수는 삭제할 수 없음
+        if (reception.getStatus() == Reception.ReceptionStatus.COMPLETED) {
+            throw new RuntimeException("이미 진료 완료된 접수는 삭제할 수 없습니다.");
+        }
+        
+        // 삭제 전 응답 객체 생성
+        ReceptionResponse response = convertToReceptionResponse(reception);
+        
+        // 관련 처방전 먼저 삭제 (진료 중인 환자의 경우)
+        if (reception.getStatus() == Reception.ReceptionStatus.CALLED) {
+            prescriptionRepository.deleteByReceptionId(receptionId);
+            log.info("관련 처방전 삭제 완료: 접수 ID {}", receptionId);
+        }
+        
+        // 관련 문진표 삭제
+        medicalSurveyRepository.deleteByReceptionId(receptionId);
+        
+        // 관련 바이탈사인 삭제
+        vitalSignRepository.deleteByReceptionId(receptionId);
+        
+        // 접수 삭제
+        receptionRepository.delete(reception);
+        
+        log.info("접수 강제 삭제 완료: 환자 {} (접수 ID: {}, 상태: {})", 
+                reception.getPatient().getName(), reception.getId(), reception.getStatus());
+        
+        // 실시간 알림 전송 (대기열 업데이트)
+        realtimeNotificationService.notifyWaitingQueueUpdate();
         
         return response;
     }
     
     @Transactional(readOnly = true)
     public List<PatientInfoResponse> getCalledPatients() {
-        List<Reception> calledReceptions = receptionRepository.findByStatusOrderByCalledAtAsc(Reception.ReceptionStatus.CALLED);
+        List<Reception> calledReceptions = receptionRepository.findCalledReceptions();
         return calledReceptions.stream()
-            .map(reception -> {
-                PatientInfoResponse patientInfo = getPatientInfo(reception.getPatient().getId());
-                patientInfo.setCurrentReceptionId(reception.getId());
-                return patientInfo;
-            })
+            .map(reception -> getPatientInfo(reception.getPatient().getId()))
             .collect(Collectors.toList());
     }
     
+    @Transactional(readOnly = true)
     public int getCurrentWaitingCount() {
-        return receptionRepository.findByStatusOrderByConfirmedAtAsc(Reception.ReceptionStatus.CONFIRMED).size();
+        return (int) receptionRepository.countByStatus(Reception.ReceptionStatus.CONFIRMED);
     }
     
     @Transactional(readOnly = true)
     public int getWaitingPosition(Long receptionId) {
         Reception reception = receptionRepository.findById(receptionId).orElse(null);
-        if (reception == null || reception.getStatus() != Reception.ReceptionStatus.CONFIRMED) {
+        if (reception == null) {
             return 0;
         }
         
-        // 해당 접수보다 먼저 확인된 접수들의 개수 + 1
-        List<Reception> confirmedReceptions = receptionRepository.findByStatusOrderByConfirmedAtAsc(Reception.ReceptionStatus.CONFIRMED);
-        for (int i = 0; i < confirmedReceptions.size(); i++) {
-            if (confirmedReceptions.get(i).getId().equals(receptionId)) {
-                return i + 1;
+        // PENDING 상태인 경우 접수 순서대로 대기 순번 계산
+        if (reception.getStatus() == Reception.ReceptionStatus.PENDING) {
+            List<Reception> pendingReceptions = receptionRepository.findByStatusOrderByCreatedAtAsc(Reception.ReceptionStatus.PENDING);
+            for (int i = 0; i < pendingReceptions.size(); i++) {
+                if (pendingReceptions.get(i).getId().equals(receptionId)) {
+                    return i + 1;
+                }
             }
         }
+        
+        // CONFIRMED 상태인 경우 확인된 순서대로 대기 순번 계산
+        if (reception.getStatus() == Reception.ReceptionStatus.CONFIRMED) {
+            List<Reception> confirmedReceptions = receptionRepository.findByStatusOrderByConfirmedAtAsc(Reception.ReceptionStatus.CONFIRMED);
+            for (int i = 0; i < confirmedReceptions.size(); i++) {
+                if (confirmedReceptions.get(i).getId().equals(receptionId)) {
+                    return i + 1;
+                }
+            }
+        }
+        
+        // CALLED 또는 COMPLETED 상태인 경우 대기 순번 없음
         return 0;
     }
     
     @Transactional(readOnly = true)
     public Reception findById(Long receptionId) {
         log.info("Finding reception by ID: {}", receptionId);
-        Reception reception = receptionRepository.findById(receptionId).orElse(null);
-        if (reception == null) {
-            log.warn("Reception not found for ID: {}", receptionId);
+        Reception reception = receptionRepository.findByIdWithPatient(receptionId).orElse(null);
+        if (reception != null) {
+            log.info("Reception found with patient: {}", reception.getPatient().getName());
         } else {
-            // LAZY 로딩 강제 초기화
-            if (reception.getPatient() != null) {
-                reception.getPatient().getName(); // 강제로 Patient 로딩
-            }
+            log.warn("Reception not found for ID: {}", receptionId);
         }
         return reception;
-    }
-    
-    @Transactional(readOnly = true)
-    public List<Reception> findConfirmedReceptions() {
-        return receptionRepository.findByStatusOrderByConfirmedAtAsc(Reception.ReceptionStatus.CONFIRMED);
     }
     
     @Transactional(readOnly = true)
@@ -330,13 +390,33 @@ public class ReceptionService {
             .filter(r -> r.getStatus() == Reception.ReceptionStatus.CALLED)
             .findFirst();
         
-        // 최근 문진표 조회
-        List<MedicalSurvey> surveys = medicalSurveyRepository.findByPatientOrderByCreatedAtDesc(patient);
-        MedicalSurveyResponse latestSurvey = surveys.isEmpty() ? null : convertToMedicalSurveyResponse(surveys.get(0));
+        // 현재 접수에 해당하는 문진표 조회 (우선순위)
+        MedicalSurveyResponse latestSurvey = null;
+        if (currentReception.isPresent()) {
+            // 현재 접수에 해당하는 문진표가 있는지 확인
+            Optional<MedicalSurvey> currentSurvey = medicalSurveyRepository.findByReception(currentReception.get());
+            if (currentSurvey.isPresent()) {
+                latestSurvey = convertToMedicalSurveyResponse(currentSurvey.get());
+                log.info("현재 접수({})에 해당하는 문진표 조회 완료: 환자 {}", 
+                        currentReception.get().getId(), patient.getName());
+            }
+        }
+        
+        // 현재 접수에 문진표가 없으면 가장 최근 문진표 조회
+        if (latestSurvey == null) {
+            List<MedicalSurvey> surveys = medicalSurveyRepository.findByPatientOrderByCreatedAtDesc(patient);
+            if (!surveys.isEmpty()) {
+                latestSurvey = convertToMedicalSurveyResponse(surveys.get(0));
+                log.info("최근 문진표 조회 완료: 환자 {} (문진표 ID: {})", 
+                        patient.getName(), surveys.get(0).getId());
+            } else {
+                log.info("문진표 없음: 환자 {}", patient.getName());
+            }
+        }
         
         // 과거 진료 이력 조회
         List<ReceptionResponse> pastReceptions = patient.getReceptions().stream()
-            .filter(r -> r.getStatus() == Reception.ReceptionStatus.DONE)
+            .filter(r -> r.getStatus() == Reception.ReceptionStatus.COMPLETED)
             .map(this::convertToReceptionResponse)
             .collect(Collectors.toList());
         
@@ -347,6 +427,7 @@ public class ReceptionService {
             .phoneNumber(patient.getPhoneNumber())
             .createdAt(patient.getCreatedAt())
             .currentReception(currentReception.map(this::convertToReceptionResponse).orElse(null))
+            .currentReceptionId(currentReception.map(Reception::getId).orElse(null))
             .latestSurvey(latestSurvey)
             .pastReceptions(pastReceptions)
             .totalVisits(pastReceptions.size())
@@ -354,7 +435,7 @@ public class ReceptionService {
             .build();
     }
     
-        @Transactional(readOnly = true)
+    @Transactional(readOnly = true)
     public List<PatientInfoResponse> searchPatientsByName(String name) {
         List<Patient> patients = patientRepository.findByNameContainingOrderByCreatedAtDesc(name);
         return patients.stream()
@@ -440,7 +521,7 @@ public class ReceptionService {
         
         // 과거 진료 이력 조회
         List<ReceptionResponse> pastReceptions = patient.getReceptions().stream()
-            .filter(r -> r.getStatus() == Reception.ReceptionStatus.DONE)
+            .filter(r -> r.getStatus() == Reception.ReceptionStatus.COMPLETED)
             .sorted((r1, r2) -> r2.getCompletedAt().compareTo(r1.getCompletedAt())) // 최신순 정렬
             .map(this::convertToReceptionResponse)
             .collect(Collectors.toList());
@@ -460,9 +541,8 @@ public class ReceptionService {
     }
     
     private boolean hasMedicalSurveyData(PatientRegistrationRequest request) {
-        return request.getSymptoms() != null || request.getAllergies() != null ||
-               request.getMedications() != null || request.getMedicalHistory() != null ||
-               request.getVisitReason() != null;
+        // 문진표 데이터는 별도 처리하므로 항상 false 반환
+        return false;
     }
     
     private int calculateWaitingPosition(Reception reception) {
@@ -478,7 +558,6 @@ public class ReceptionService {
             .phoneNumber(reception.getPatient().getPhoneNumber())
             .status(reception.getStatus())
             .isGuardian(reception.getIsGuardian())
-            .notifyAt(reception.getNotifyAt())
             .createdAt(reception.getCreatedAt())
             .confirmedAt(reception.getConfirmedAt())
             .calledAt(reception.getCalledAt())
@@ -501,90 +580,6 @@ public class ReceptionService {
             .build();
     }
     
-    /**
-     * 호출된 환자에게 SMS 발송
-     */
-    private void sendCallSmsNotification(Reception reception) {
-        try {
-            if (reception.getNotifyEnabled()) {
-                Patient patient = reception.getPatient();
-                String phoneNumber = patient.getPhoneNumber();
-                
-                if (smsService.isValidPhoneNumber(phoneNumber)) {
-                    String formattedPhoneNumber = smsService.formatPhoneNumber(phoneNumber);
-                    boolean smsSent = smsService.sendCallNotification(formattedPhoneNumber, patient.getName());
-                    
-                    if (smsSent) {
-                        log.info("호출 SMS 발송 완료: 환자 {} (전화번호: {})", patient.getName(), phoneNumber);
-                    } else {
-                        log.warn("호출 SMS 발송 실패: 환자 {} (전화번호: {})", patient.getName(), phoneNumber);
-                    }
-                } else {
-                    log.warn("유효하지 않은 전화번호로 호출 SMS 발송 불가: 환자 {} (전화번호: {})", 
-                            patient.getName(), phoneNumber);
-                }
-            } else {
-                log.debug("SMS 알림이 비활성화된 환자: {}", reception.getPatient().getName());
-            }
-        } catch (Exception e) {
-            log.error("호출 SMS 발송 중 오류 발생: 환자 {} - {}", reception.getPatient().getName(), e.getMessage(), e);
-        }
-    }
-    
-    /**
-     * SMS 알림 발송 체크 및 실행
-     * 2팀 전에 있는 환자들에게 SMS 알림 발송
-     */
-    private void checkAndSendSmsNotifications() {
-        try {
-            // 현재 확인된 대기 환자들 조회 (확인 시간 순)
-            List<Reception> confirmedReceptions = receptionRepository.findByStatusOrderByConfirmedAtAsc(Reception.ReceptionStatus.CONFIRMED);
-            
-            // 대기 환자가 3명 이상일 때만 SMS 발송 (3번째부터 알림)
-            if (confirmedReceptions.size() >= 3) {
-                // 3번째 환자부터 SMS 발송 (2팀 전에 알림)
-                for (int i = 2; i < confirmedReceptions.size(); i++) {
-                    Reception reception = confirmedReceptions.get(i);
-                    
-                    // SMS 알림이 활성화되어 있고, 아직 발송하지 않은 경우
-                    if (reception.getNotifyEnabled() && !smsService.isAlreadySent(reception.getId())) {
-                        Patient patient = reception.getPatient();
-                        String phoneNumber = patient.getPhoneNumber();
-                        
-                        // 전화번호가 유효한 경우에만 SMS 발송
-                        if (smsService.isValidPhoneNumber(phoneNumber)) {
-                            String formattedPhoneNumber = smsService.formatPhoneNumber(phoneNumber);
-                            int waitingPosition = i + 1; // 대기 순서 (1부터 시작)
-                            
-                            boolean smsSent = smsService.sendWaitingNotification(
-                                formattedPhoneNumber, 
-                                patient.getName(), 
-                                waitingPosition
-                            );
-                            
-                            if (smsSent) {
-                                // 발송 완료 표시
-                                smsService.markAsSent(reception.getId());
-                                log.info("SMS 알림 발송 완료: 환자 {} ({}번째 대기, 전화번호: {})", 
-                                        patient.getName(), waitingPosition, phoneNumber);
-                            } else {
-                                log.warn("SMS 알림 발송 실패: 환자 {} ({}번째 대기, 전화번호: {})", 
-                                        patient.getName(), waitingPosition, phoneNumber);
-                            }
-                        } else {
-                            log.warn("유효하지 않은 전화번호로 SMS 발송 불가: 환자 {} (전화번호: {})", 
-                                    patient.getName(), phoneNumber);
-                        }
-                    }
-                }
-            } else {
-                log.debug("대기 환자가 3명 미만이므로 SMS 알림 발송하지 않음 (현재 {}명)", confirmedReceptions.size());
-            }
-        } catch (Exception e) {
-            log.error("SMS 알림 발송 중 오류 발생: {}", e.getMessage(), e);
-        }
-    }
-    
     private VitalSignResponse convertToVitalSignResponse(VitalSign vitalSign) {
         return VitalSignResponse.builder()
                 .id(vitalSign.getId())
@@ -600,5 +595,28 @@ public class ReceptionService {
                 .nurseId(vitalSign.getNurseId())
                 .createdAt(vitalSign.getCreatedAt())
                 .build();
+    }
+    
+    /**
+     * SMS 알림 설정 업데이트
+     */
+    @Transactional
+    public void updateSmsNotification(Long receptionId, Boolean enabled) {
+        Reception reception = receptionRepository.findById(receptionId)
+            .orElseThrow(() -> new RuntimeException("접수를 찾을 수 없습니다."));
+        
+        reception.setSmsNotificationEnabled(enabled);
+        receptionRepository.save(reception);
+        
+        log.info("SMS 알림 설정 업데이트: 접수 ID {}, 활성화 여부 {}", receptionId, enabled);
+        
+        // SMS 설정 변경 후 대기열 체크
+        if (Boolean.TRUE.equals(enabled)) {
+            waitingQueueService.checkAndSendSmsNotifications();
+        }
+    }
+
+    public Reception save(Reception reception) {
+        return receptionRepository.save(reception);
     }
 } 

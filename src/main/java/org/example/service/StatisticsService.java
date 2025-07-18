@@ -32,9 +32,8 @@ public class StatisticsService {
         LocalDateTime endDate = date.plusDays(1).atStartOfDay();
         
         long totalReceptions = receptionRepository.countByDate(startDate, endDate);
-        long completedReceptions = receptionRepository.countByStatusAndDate(Reception.ReceptionStatus.DONE, startDate, endDate);
-        long noShowReceptions = receptionRepository.countByStatusAndDate(Reception.ReceptionStatus.NO_RESPONSE, startDate, endDate) +
-                               receptionRepository.countByStatusAndDate(Reception.ReceptionStatus.CANCELED, startDate, endDate);
+        long completedReceptions = receptionRepository.countByStatusAndDate(Reception.ReceptionStatus.COMPLETED, startDate, endDate);
+        long noShowReceptions = 0; // 현재 시스템에서는 NO_RESPONSE, CANCELED 상태가 없음
         long guardianReceptions = receptionRepository.countGuardianReceptionsByDate(startDate, endDate);
         
         double guardianRatio = totalReceptions > 0 ? (double) guardianReceptions / totalReceptions * 100 : 0;
@@ -67,8 +66,8 @@ public class StatisticsService {
         LocalDateTime startDateTime = startDate.atStartOfDay();
         LocalDateTime endDateTime = endDate.plusDays(1).atStartOfDay();
         
-        // 기본 통계 계산
-        List<Reception> receptions = receptionRepository.findByCreatedAtBetween(startDateTime, endDateTime);
+        // 기본 통계 계산 (Patient 정보 포함)
+        List<Reception> receptions = receptionRepository.findByCreatedAtBetweenWithPatient(startDateTime, endDateTime);
         long totalVisits = receptions.size();
         
         // 신규 환자 수 계산 (해당 기간 중 첫 접수인 환자들)

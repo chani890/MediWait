@@ -18,6 +18,8 @@ public interface PatientRepository extends JpaRepository<Patient, Long> {
     @Query("SELECT p FROM Patient p WHERE p.name = :name AND p.birthDate = :birthDate")
     Optional<Patient> findByNameAndBirthDate(@Param("name") String name, @Param("birthDate") LocalDate birthDate);
     
+    Optional<Patient> findByNameAndPhoneNumber(String name, String phoneNumber);
+    
     List<Patient> findByNameContainingOrderByCreatedAtDesc(String name);
     
     boolean existsByNameAndBirthDateAndPhoneNumber(String name, LocalDate birthDate, String phoneNumber);

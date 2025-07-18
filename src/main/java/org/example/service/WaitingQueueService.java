@@ -7,9 +7,7 @@ import org.example.repository.ReceptionRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -19,123 +17,91 @@ public class WaitingQueueService {
     private final ReceptionRepository receptionRepository;
     private final SmsService smsService;
     
-    // 이미 SMS를 발송한 접수 ID들을 추적하는 Set
-    private final Set<Long> smsNotifiedReceptionIds = new HashSet<>();
-    
     /**
-     * 대기 순서 변경 시 SMS 알림 체크 및 발송
-     * 각 환자의 notifyAt 설정에 따라 알림 발송
+     * 대기열 변경 시 SMS 알림 체크 및 발송
+     * 설정된 발송 시점에 따라 SMS 발송
      */
-    @Transactional(readOnly = true)
-    public void checkAndSendWaitingNotifications() {
-        log.info("대기 순서 SMS 알림 체크 시작");
-        
-        // 확인된 환자들을 순서대로 조회
-        List<Reception> confirmedReceptions = receptionRepository.findConfirmedReceptionsInOrder();
-        
-        if (confirmedReceptions.size() < 3) {
-            log.debug("대기 환자가 3명 미만이므로 SMS 알림 발송하지 않음. 현재 대기: {}명", confirmedReceptions.size());
-            return;
-        }
-        
-        // 각 환자의 notifyAt 설정에 따라 SMS 발송
-        for (int i = 0; i < confirmedReceptions.size(); i++) {
-            Reception reception = confirmedReceptions.get(i);
-            int remainingCount = i; // 앞 대기자 수
+    @Transactional
+    public void checkAndSendSmsNotifications() {
+        try {
+            // CONFIRMED 상태인 환자들을 확인 시간 순으로 조회
+            List<Reception> waitingReceptions = receptionRepository.findByStatusOrderByConfirmedAtAsc(
+                Reception.ReceptionStatus.CONFIRMED
+            );
             
-            // notifyAt 설정이 없거나 SMS 알림이 비활성화된 경우 건너뛰기
-            if (reception.getNotifyAt() == null || !reception.getNotifyEnabled()) {
-                continue;
-            }
+            log.info("대기 중인 환자 수: {}", waitingReceptions.size());
             
-            // 앞 대기자 수가 설정된 notifyAt와 일치하는 경우에만 알림 발송
-            if (remainingCount != reception.getNotifyAt()) {
-                continue;
-            }
+            // 설정된 발송 시점 가져오기 (기본값: 2번째 순서)
+            int notifyTiming = smsService.getSmsNotifyTiming();
             
-            // 이미 알림을 보낸 접수인지 확인
-            if (smsNotifiedReceptionIds.contains(reception.getId())) {
-                log.debug("이미 SMS 알림을 발송한 접수: ID {}, 환자 {}", reception.getId(), reception.getPatient().getName());
-                continue;
-            }
-            
-            // SMS 알림이 활성화되어 있고 전화번호가 있는 경우에만 발송
-            if (reception.getPatient().getPhoneNumber() != null) {
-                boolean smsSuccess = smsService.sendWaitingNotification(
-                    reception.getPatient().getPhoneNumber(),
-                    reception.getPatient().getName(),
-                    remainingCount
-                );
+            // 대기 인원이 설정된 시점 이상이어야 SMS 발송 가능
+            if (waitingReceptions.size() >= notifyTiming) {
+                // 설정된 순서의 대기자 (인덱스는 0부터 시작하므로 -1)
+                Reception targetWaitingReception = waitingReceptions.get(notifyTiming - 1);
                 
-                if (smsSuccess) {
-                    // 발송 성공 시 추적 Set에 추가
-                    smsNotifiedReceptionIds.add(reception.getId());
-                    log.info("대기 순서 SMS 발송 성공: 환자 {} (앞 대기자 {}명)", reception.getPatient().getName(), remainingCount);
-                } else {
-                    log.warn("대기 순서 SMS 발송 실패: 환자 {} (앞 대기자 {}명)", reception.getPatient().getName(), remainingCount);
+                // SMS 알림이 활성화되어 있고 아직 발송되지 않은 경우
+                if (Boolean.TRUE.equals(targetWaitingReception.getSmsNotificationEnabled()) && 
+                    !Boolean.TRUE.equals(targetWaitingReception.getSmsSent())) {
+                    
+                    String phoneNumber = targetWaitingReception.getPatient().getPhoneNumber();
+                    String patientName = targetWaitingReception.getPatient().getName();
+                    
+                    // 전화번호 유효성 검증
+                    if (smsService.isValidPhoneNumber(phoneNumber)) {
+                        boolean smsResult = smsService.sendWaitingNotification(phoneNumber, patientName);
+                        
+                        if (smsResult) {
+                            // SMS 발송 성공 시 플래그 업데이트
+                            targetWaitingReception.setSmsSent(true);
+                            receptionRepository.save(targetWaitingReception);
+                            log.info("SMS 발송 완료: {} ({})", patientName, phoneNumber);
+                        } else {
+                            log.error("SMS 발송 실패: {} ({})", patientName, phoneNumber);
+                        }
+                    } else {
+                        log.warn("유효하지 않은 전화번호: {} ({})", patientName, phoneNumber);
+                    }
                 }
             } else {
-                log.debug("SMS 알림 조건 불충족: 환자 {} - 전화번호: {}", 
-                    reception.getPatient().getName(), 
-                    reception.getPatient().getPhoneNumber() != null ? "있음" : "없음");
+                log.debug("대기 인원이 {}명 미만이므로 SMS 발송하지 않음", notifyTiming);
             }
-        }
-        
-        log.info("대기 순서 SMS 알림 체크 완료");
-    }
-    
-    /**
-     * 환자 호출 시 SMS 발송
-     */
-    public void sendCallNotification(Reception reception) {
-        if (reception.getNotifyEnabled() && reception.getPatient().getPhoneNumber() != null) {
-            boolean smsSuccess = smsService.sendCallNotification(
-                reception.getPatient().getPhoneNumber(),
-                reception.getPatient().getName()
-            );
             
-            if (smsSuccess) {
-                log.info("호출 SMS 발송 성공: 환자 {}", reception.getPatient().getName());
-            } else {
-                log.warn("호출 SMS 발송 실패: 환자 {}", reception.getPatient().getName());
+        } catch (Exception e) {
+            log.error("SMS 알림 체크 중 오류 발생: {}", e.getMessage(), e);
+        }
+    }
+    
+    /**
+     * 환자 상태 변경 시 SMS 발송 상태 초기화
+     * 환자가 다시 대기열에 들어갔을 때 SMS를 재발송할 수 있도록 함
+     */
+    @Transactional
+    public void resetSmsStatusForReception(Long receptionId) {
+        try {
+            Reception reception = receptionRepository.findById(receptionId).orElse(null);
+            if (reception != null) {
+                reception.setSmsSent(false);
+                receptionRepository.save(reception);
+                log.info("SMS 발송 상태 초기화: 접수 ID {}", receptionId);
             }
-        } else {
-            log.debug("호출 SMS 발송 조건 불충족: 환자 {} - 알림설정: {}, 전화번호: {}", 
-                reception.getPatient().getName(), 
-                reception.getNotifyEnabled(), 
-                reception.getPatient().getPhoneNumber() != null ? "있음" : "없음");
+        } catch (Exception e) {
+            log.error("SMS 상태 초기화 중 오류 발생: {}", e.getMessage());
         }
     }
     
     /**
-     * 접수 완료 시 SMS 추적에서 제거
+     * 특정 환자의 대기 순서 조회
      */
-    public void removeFromSmsTracking(Long receptionId) {
-        if (smsNotifiedReceptionIds.remove(receptionId)) {
-            log.debug("SMS 추적에서 제거: 접수 ID {}", receptionId);
-        }
-    }
-    
-    /**
-     * 현재 SMS 알림 발송 상태 조회 (디버깅용)
-     */
-    @Transactional(readOnly = true)
-    public void logCurrentWaitingStatus() {
-        List<Reception> confirmedReceptions = receptionRepository.findConfirmedReceptionsInOrder();
-        log.info("=== 현재 대기 현황 ===");
-        log.info("총 대기 환자 수: {}명", confirmedReceptions.size());
+    public int getWaitingPosition(Long receptionId) {
+        List<Reception> waitingReceptions = receptionRepository.findByStatusOrderByConfirmedAtAsc(
+            Reception.ReceptionStatus.CONFIRMED
+        );
         
-        for (int i = 0; i < confirmedReceptions.size(); i++) {
-            Reception reception = confirmedReceptions.get(i);
-            boolean smsNotified = smsNotifiedReceptionIds.contains(reception.getId());
-            log.info("{}번째: {} (ID: {}, SMS발송: {}, 알림설정: {})", 
-                i + 1, 
-                reception.getPatient().getName(), 
-                reception.getId(),
-                smsNotified ? "완료" : "미발송",
-                reception.getNotifyEnabled() ? "활성" : "비활성"
-            );
+        for (int i = 0; i < waitingReceptions.size(); i++) {
+            if (waitingReceptions.get(i).getId().equals(receptionId)) {
+                return i + 1; // 1부터 시작하는 순서
+            }
         }
-        log.info("===================");
+        return 0; // 대기열에 없음
     }
 } 
