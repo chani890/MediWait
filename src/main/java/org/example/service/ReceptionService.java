@@ -344,12 +344,16 @@ public class ReceptionService {
             return 0;
         }
         
-        // PENDING 상태인 경우 접수 순서대로 대기 순번 계산
+        // PENDING 상태인 경우: CONFIRMED 환자 수 + PENDING 목록에서의 순서
         if (reception.getStatus() == Reception.ReceptionStatus.PENDING) {
+            // CONFIRMED된 환자 수 계산
+            int confirmedCount = (int) receptionRepository.countByStatus(Reception.ReceptionStatus.CONFIRMED);
+            
+            // PENDING 목록에서의 순서 계산
             List<Reception> pendingReceptions = receptionRepository.findByStatusOrderByCreatedAtAsc(Reception.ReceptionStatus.PENDING);
             for (int i = 0; i < pendingReceptions.size(); i++) {
                 if (pendingReceptions.get(i).getId().equals(receptionId)) {
-                    return i + 1;
+                    return confirmedCount + i + 1;
                 }
             }
         }
@@ -546,7 +550,32 @@ public class ReceptionService {
     }
     
     private int calculateWaitingPosition(Reception reception) {
-        return receptionRepository.countConfirmedBefore(reception.getCreatedAt()) + 1;
+        // PENDING 상태인 경우: CONFIRMED 환자 수 + PENDING 목록에서의 순서
+        if (reception.getStatus() == Reception.ReceptionStatus.PENDING) {
+            // CONFIRMED된 환자 수 계산
+            int confirmedCount = (int) receptionRepository.countByStatus(Reception.ReceptionStatus.CONFIRMED);
+            
+            // PENDING 목록에서의 순서 계산
+            List<Reception> pendingReceptions = receptionRepository.findByStatusOrderByCreatedAtAsc(Reception.ReceptionStatus.PENDING);
+            for (int i = 0; i < pendingReceptions.size(); i++) {
+                if (pendingReceptions.get(i).getId().equals(reception.getId())) {
+                    return confirmedCount + i + 1;
+                }
+            }
+        }
+        
+        // CONFIRMED 상태인 경우 확인된 순서대로 대기 순번 계산
+        if (reception.getStatus() == Reception.ReceptionStatus.CONFIRMED) {
+            List<Reception> confirmedReceptions = receptionRepository.findByStatusOrderByConfirmedAtAsc(Reception.ReceptionStatus.CONFIRMED);
+            for (int i = 0; i < confirmedReceptions.size(); i++) {
+                if (confirmedReceptions.get(i).getId().equals(reception.getId())) {
+                    return i + 1;
+                }
+            }
+        }
+        
+        // CALLED 또는 COMPLETED 상태인 경우 대기 순번 없음
+        return 0;
     }
     
     private ReceptionResponse convertToReceptionResponse(Reception reception) {

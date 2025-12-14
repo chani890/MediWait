@@ -1,8 +1,8 @@
 spring:
   datasource:
-    url: jdbc:postgresql://aws-0-ap-northeast-2.pooler.supabase.com:6543/postgres?sslmode=require&pgbouncer=true&prepareThreshold=0&preparedStatementCacheQueries=0&preparedStatementCacheSizeMiB=0
+    url: jdbc:postgresql://aws-0-ap-northeast-2.pooler.supabase.com:5432/postgres
     username: postgres.vxamlnzkuwygfeuleuln
-    password: chan0911@
+    password: epdlxjqpdltm
     driver-class-name: org.postgresql.Driver
     hikari:
       pool-name: HospitalQrSystemPool
@@ -14,11 +14,15 @@ spring:
       leak-detection-threshold: 60000
       auto-commit: false
       connection-test-query: SELECT 1
+      initialization-fail-timeout: -1
   
   jpa:
     hibernate:
       ddl-auto: update
     show-sql: true
+  sql:
+    init:
+      continue-on-error: true
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect

@@ -78,7 +78,7 @@ public class SmsService {
             
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
-            headers.set("Authorization", String.format("HMAC-SHA256 apiKey=%s, date=%s, salt=%s, signature=%s", 
+            headers.set("Authorization", String.format("HMAC-SHA256 =%s, date=%s, salt=%s, signature=%s", 
                     apiKey, timestamp, salt, signature));
             
             HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);

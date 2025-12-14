@@ -24,6 +24,16 @@ public class Prescription {
     @JoinColumn(name = "reception_id", nullable = false)
     private Reception reception;
     
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "doctor_id")
+    private User doctor;  // 처방의 (의사)
+    
+    @Column(name = "doctor_name", length = 50)
+    private String doctorName;  // 처방의 성명
+    
+    @Column(name = "doctor_license_number", length = 50)
+    private String doctorLicenseNumber;  // 의사 면허번호
+    
     @Column(name = "diagnosis", columnDefinition = "TEXT")
     private String diagnosis; // 진단명
     

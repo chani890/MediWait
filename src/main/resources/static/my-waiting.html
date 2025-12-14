@@ -441,8 +441,8 @@
     <script>
         // API URL을 동적으로 설정
         function getApiBaseUrl() {
-            // 실제 서버 IP로 고정
-            return 'http://192.168.70.26:8081';
+            // 현재 호스트를 동적으로 사용
+            return window.location.origin;
         }
         
         const API_BASE_URL = getApiBaseUrl();
@@ -457,7 +457,7 @@
 
         // WebSocket 연결
         function connectWebSocket() {
-            const socket = new SockJS('http://192.168.70.26:8081/ws');
+            const socket = new SockJS(window.location.origin + '/ws');
             stompClient = Stomp.over(socket);
             
             stompClient.connect({}, function(frame) {

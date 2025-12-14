@@ -1,0 +1,840 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>서대 병원 - 메인</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f8f9fa;
+            color: #333;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            background: white;
+            color: black;
+            padding: 1.5rem 2rem;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 0;
+        }
+
+        .header-buttons {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .btn {
+            padding: 0.7rem 1.2rem;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.95rem;
+            font-weight: 600;
+            transition: all 0.3s;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .btn-logout {
+            background: #dc3545;
+            color: white;
+        }
+
+        .btn-logout:hover {
+            background: #c82333;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(220, 53, 69, 0.3);
+        }
+
+        .main-content {
+            flex: 1;
+            max-width: 1200px;
+            width: 100%;
+            margin: 0 auto;
+            padding: 3rem 2rem;
+        }
+
+        .welcome-section {
+            background: white;
+            padding: 2rem;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            margin-bottom: 3rem;
+            text-align: center;
+        }
+
+        .welcome-section h2 {
+            font-size: 2rem;
+            color: #333;
+            margin-bottom: 0.5rem;
+        }
+
+        .welcome-section .user-info {
+            font-size: 1.2rem;
+            color: #666;
+        }
+
+        .welcome-section .user-info strong {
+            color: #333;
+            font-weight: 700;
+        }
+
+        .menu-section {
+            margin-top: 2rem;
+        }
+
+        .menu-section h3 {
+            font-size: 1.5rem;
+            color: #333;
+            margin-bottom: 1.5rem;
+            text-align: center;
+        }
+
+        .menu-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+        }
+
+        .menu-card {
+            background: white;
+            border-radius: 10px;
+            padding: 2.5rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            border: 2px solid transparent;
+        }
+
+        .menu-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+            border-color: #333;
+        }
+
+        .menu-card i {
+            font-size: 4rem;
+            margin-bottom: 1.5rem;
+            display: block;
+            color: #333;
+        }
+
+        .menu-card h2 {
+            font-size: 1.5rem;
+            margin-bottom: 0.8rem;
+            color: #333;
+        }
+
+        .menu-card p {
+            font-size: 1rem;
+            color: #666;
+            line-height: 1.5;
+        }
+
+        .menu-card.nurse {
+            border-top: 4px solid #28a745;
+        }
+
+        .menu-card.nurse:hover {
+            border-color: #28a745;
+        }
+
+        .menu-card.nurse i {
+            color: #28a745;
+        }
+
+        .menu-card.doctor {
+            border-top: 4px solid #007bff;
+        }
+
+        .menu-card.doctor:hover {
+            border-color: #007bff;
+        }
+
+        .menu-card.doctor i {
+            color: #007bff;
+        }
+
+        .menu-card.display {
+            border-top: 4px solid #6c757d;
+        }
+
+        .menu-card.display:hover {
+            border-color: #6c757d;
+        }
+
+        .menu-card.display i {
+            color: #6c757d;
+        }
+
+        .footer {
+            text-align: center;
+            padding: 1.5rem;
+            background: white;
+            color: #999;
+            font-size: 0.85rem;
+            box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.05);
+        }
+
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 1.8rem;
+            }
+
+            .menu-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .main-content {
+                padding: 2rem 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><i class="fas fa-hospital"></i> 서대 병원</h1>
+        <div class="header-buttons">
+            <button class="btn btn-logout" onclick="logout()">
+                <i class="fas fa-sign-out-alt"></i> 로그아웃
+            </button>
+        </div>
+    </div>
+
+    <div class="main-content">
+        <div class="welcome-section">
+            <h2>환영합니다!</h2>
+            <div class="user-info">
+                <strong id="userName"></strong>님 (<span id="userRole"></span>)
+            </div>
+        </div>
+
+        <div class="menu-section">
+            <h3>원하시는 메뉴를 선택해주세요</h3>
+            <div class="menu-grid" id="menuGrid">
+                <!-- 메뉴는 JavaScript로 동적 생성 -->
+            </div>
+        </div>
+        
+        <!-- 공지사항 섹션 (간호사/관리자만 표시) -->
+        <div id="announcementSection" style="display: none; margin-top: 3rem;">
+            <div style="background: white; border-radius: 15px; padding: 2rem; box-shadow: 0 2px 15px rgba(0,0,0,0.1);">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 2px solid #e9ecef;">
+                    <h3 style="margin: 0; color: #333; font-size: 1.6rem;">
+                        <i class="fas fa-bullhorn" style="margin-right: 0.5rem;"></i>
+                        공지사항 관리
+                    </h3>
+                    <button onclick="showAddAnnouncementModal()" style="padding: 0.7rem 1.5rem; background: white; color: #333; border: 2px solid #333; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 0.95rem; transition: all 0.3s; display: flex; align-items: center; gap: 0.5rem;" onmouseover="this.style.background='#f8f9fa'; this.style.borderColor='#000'" onmouseout="this.style.background='white'; this.style.borderColor='#333'">
+                        <i class="fas fa-plus"></i> 공지사항 추가
+                    </button>
+                </div>
+                
+                <div id="announcementsList">
+                    <!-- 공지사항 목록이 여기에 표시됩니다 -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="footer">
+        © 2025 서대 병원. All rights reserved.
+    </div>
+
+    <script>
+        const API_BASE_URL = window.location.origin + '/api';
+
+        // 로그인 확인
+        const token = localStorage.getItem('token');
+        const userStr = localStorage.getItem('user');
+
+        if (!token || !userStr) {
+            // 로그인되지 않은 경우 로그인 페이지로
+            window.location.replace('/login.html');
+        }
+
+        const user = JSON.parse(userStr);
+
+        // 사용자 정보 표시
+        document.getElementById('userName').textContent = user.name;
+        
+        let roleText = '';
+        if (user.role === 'DOCTOR') {
+            roleText = '의사';
+        } else if (user.role === 'NURSE') {
+            roleText = '간호사';
+        } else if (user.role === 'ADMIN') {
+            roleText = '관리자';
+        }
+        document.getElementById('userRole').textContent = roleText;
+
+        // 역할별 메뉴 구성
+        const menuGrid = document.getElementById('menuGrid');
+
+        if (user.role === 'DOCTOR') {
+            // 의사: 의사 페이지 + 마이페이지 + 대기열 화면
+            menuGrid.innerHTML = `
+                <div class="menu-card doctor" onclick="goToPage('/doctor.html')">
+                    <i class="fas fa-user-md"></i>
+                    <h2>의사 페이지</h2>
+                    <p>진료 및 처방전 작성<br>환자 진료 기록 관리</p>
+                </div>
+                <div class="menu-card" style="border-top: 4px solid #17a2b8;" onclick="showProfileModal()">
+                    <i class="fas fa-user-circle" style="color: #17a2b8;"></i>
+                    <h2>마이페이지</h2>
+                    <p>내 정보 확인 및 수정<br>비밀번호 변경</p>
+                </div>
+                <div class="menu-card display" onclick="goToPage('/waiting-display.html')">
+                    <i class="fas fa-tv"></i>
+                    <h2>대기열 화면</h2>
+                    <p>대기 환자 현황 보기<br>실시간 대기 정보</p>
+                </div>
+            `;
+        } else if (user.role === 'NURSE' || user.role === 'ADMIN') {
+            // 간호사/관리자: 간호사 페이지 + 마이페이지 + 대기열 화면
+            menuGrid.innerHTML = `
+                <div class="menu-card nurse" onclick="goToPage('/nurse.html')">
+                    <i class="fas fa-user-nurse"></i>
+                    <h2>간호사 페이지</h2>
+                    <p>환자 접수 및 관리<br>처방전 출력 및 통계</p>
+                </div>
+                <div class="menu-card" style="border-top: 4px solid #17a2b8;" onclick="showProfileModal()">
+                    <i class="fas fa-user-circle" style="color: #17a2b8;"></i>
+                    <h2>마이페이지</h2>
+                    <p>내 정보 확인 및 수정<br>비밀번호 변경</p>
+                </div>
+                <div class="menu-card display" onclick="goToPage('/waiting-display.html')">
+                    <i class="fas fa-tv"></i>
+                    <h2>대기열 화면</h2>
+                    <p>대기 환자 현황 보기<br>실시간 대기 정보</p>
+                </div>
+            `;
+            
+            // 간호사/관리자인 경우 공지사항 섹션 표시
+            showAnnouncementSection();
+        }
+
+        // 페이지 이동
+        function goToPage(url) {
+            window.location.href = url;
+        }
+
+        // 로그아웃
+        function logout() {
+            if (confirm('로그아웃 하시겠습니까?')) {
+                localStorage.removeItem('token');
+                localStorage.removeItem('user');
+                window.location.replace('/login.html');
+            }
+        }
+
+        // 마이페이지 모달 표시
+        function showProfileModal() {
+            loadUserProfile();
+            document.getElementById('profileModal').style.display = 'flex';
+        }
+
+        // 마이페이지 모달 닫기
+        function closeProfileModal() {
+            document.getElementById('profileModal').style.display = 'none';
+        }
+
+        // 사용자 프로필 로드
+        function loadUserProfile() {
+            const userStr = localStorage.getItem('user');
+            if (!userStr) {
+                alert('로그인 정보가 없습니다.');
+                window.location.href = '/login.html';
+                return;
+            }
+            
+            const user = JSON.parse(userStr);
+            
+            fetch(`${API_BASE_URL}/users/${user.userId}`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('사용자 정보 로드 실패');
+                    }
+                    return response.json();
+                })
+                .then(userInfo => {
+                    document.getElementById('profileUsername').value = userInfo.username;
+                    document.getElementById('profileName').value = userInfo.name;
+                    document.getElementById('profilePhone').value = userInfo.phoneNumber || '';
+                    document.getElementById('profileLicense').value = userInfo.licenseNumber || '-';
+                    document.getElementById('profileRole').value = getRoleText(userInfo.role);
+                    
+                    // 의사 면허번호 필드 표시/숨김
+                    const licenseGroup = document.getElementById('licenseGroup');
+                    if (userInfo.role === 'DOCTOR') {
+                        licenseGroup.style.display = 'block';
+                    } else {
+                        licenseGroup.style.display = 'none';
+                    }
+                    
+                    // 비밀번호 필드 초기화
+                    document.getElementById('currentPassword').value = '';
+                    document.getElementById('newPassword').value = '';
+                    document.getElementById('newPasswordConfirm').value = '';
+                })
+                .catch(error => {
+                    console.error('사용자 정보 로드 실패:', error);
+                    alert('사용자 정보를 불러올 수 없습니다.');
+                });
+        }
+
+        // 역할 텍스트 변환
+        function getRoleText(role) {
+            const roleMap = {
+                'ADMIN': '관리자',
+                'DOCTOR': '의사',
+                'NURSE': '간호사'
+            };
+            return roleMap[role] || role;
+        }
+
+        // 프로필 업데이트
+        function updateProfile() {
+            const name = document.getElementById('profileName').value.trim();
+            const phoneNumber = document.getElementById('profilePhone').value.trim();
+            const currentPassword = document.getElementById('currentPassword').value;
+            const newPassword = document.getElementById('newPassword').value;
+            const newPasswordConfirm = document.getElementById('newPasswordConfirm').value;
+            
+            if (!name) {
+                alert('이름을 입력해주세요.');
+                return;
+            }
+            
+            // 비밀번호 변경 시 확인
+            if (newPassword || currentPassword) {
+                if (!currentPassword) {
+                    alert('현재 비밀번호를 입력해주세요.');
+                    return;
+                }
+                if (!newPassword) {
+                    alert('새 비밀번호를 입력해주세요.');
+                    return;
+                }
+                if (newPassword !== newPasswordConfirm) {
+                    alert('새 비밀번호가 일치하지 않습니다.');
+                    return;
+                }
+                if (newPassword.length < 4) {
+                    alert('새 비밀번호는 최소 4자 이상이어야 합니다.');
+                    return;
+                }
+            }
+            
+            const userStr = localStorage.getItem('user');
+            if (!userStr) {
+                alert('로그인 정보가 없습니다.');
+                window.location.href = '/login.html';
+                return;
+            }
+            
+            const user = JSON.parse(userStr);
+            
+            const data = {
+                name: name,
+                phoneNumber: phoneNumber || null,
+                currentPassword: currentPassword || null,
+                newPassword: newPassword || null
+            };
+            
+            fetch(`${API_BASE_URL}/users/${user.userId}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(data)
+            })
+            .then(response => {
+                if (!response.ok) {
+                    return response.text().then(text => {
+                        throw new Error(text || '정보 수정 실패');
+                    });
+                }
+                return response.json();
+            })
+            .then(result => {
+                alert('정보가 수정되었습니다.');
+                
+                // localStorage의 user 정보 업데이트
+                user.name = result.name;
+                localStorage.setItem('user', JSON.stringify(user));
+                
+                // 화면 갱신
+                document.getElementById('userName').textContent = result.name;
+                
+                // 프로필 다시 로드
+                loadUserProfile();
+            })
+            .catch(error => {
+                console.error('정보 수정 실패:', error);
+                alert('정보 수정에 실패했습니다: ' + error.message);
+            });
+        }
+        
+        // ========== 공지사항 관리 함수들 ==========
+        
+        // 공지사항 섹션 표시 (간호사/관리자만)
+        function showAnnouncementSection() {
+            document.getElementById('announcementSection').style.display = 'block';
+            loadAnnouncements();
+        }
+        
+        // 공지사항 목록 로드
+        function loadAnnouncements() {
+            fetch(`${API_BASE_URL}/announcements`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('공지사항 로드 실패');
+                    }
+                    return response.json();
+                })
+                .then(announcements => {
+                    renderAnnouncements(announcements);
+                })
+                .catch(error => {
+                    console.error('공지사항 로드 실패:', error);
+                    document.getElementById('announcementsList').innerHTML = `
+                        <div style="text-align: center; padding: 3rem; background: linear-gradient(135deg, #ffe8e8 0%, #fff0f0 100%); border-radius: 20px; border: 2px solid #ffcccc;">
+                            <i class="fas fa-exclamation-triangle" style="font-size: 3rem; color: #eb3349; margin-bottom: 1rem;"></i><br>
+                            <strong style="color: #2c3e50; font-size: 1.1rem;">공지사항을 불러올 수 없습니다</strong>
+                            <p style="color: #95a5a6; margin: 0.5rem 0 0 0; font-size: 0.95rem;">잠시 후 다시 시도해주세요</p>
+                        </div>
+                    `;
+                });
+        }
+        
+        // 공지사항 목록 렌더링 (테이블 형식)
+        function renderAnnouncements(announcements) {
+            const container = document.getElementById('announcementsList');
+            
+            if (!announcements || announcements.length === 0) {
+                container.innerHTML = `
+                    <div style="text-align: center; padding: 3rem; color: #6c757d; background: #f8f9fa; border-radius: 10px;">
+                        <i class="fas fa-inbox" style="font-size: 3rem; margin-bottom: 1rem; opacity: 0.5;"></i>
+                        <p style="margin: 0; font-size: 1.1rem;">등록된 공지사항이 없습니다</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            // displayOrder 순서대로 정렬
+            announcements.sort((a, b) => a.displayOrder - b.displayOrder);
+            
+            // 테이블 형식으로 렌더링
+            container.innerHTML = `
+                <table style="width: 100%; border-collapse: collapse; background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                    <thead>
+                        <tr style="background: #f8f9fa; border-bottom: 2px solid #dee2e6;">
+                            <th style="padding: 1rem 1.5rem; text-align: left; color: #495057; font-weight: 600;">순서</th>
+                            <th style="padding: 1rem 1.5rem; text-align: left; color: #495057; font-weight: 600;">제목</th>
+                            <th style="padding: 1rem 1.5rem; text-align: left; color: #495057; font-weight: 600;">내용</th>
+                            <th style="padding: 1rem 1.5rem; text-align: center; color: #495057; font-weight: 600;">상태</th>
+                            <th style="padding: 1rem 1.5rem; text-align: center; color: #495057; font-weight: 600;">관리</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${announcements.map((a, index) => `
+                            <tr style="border-bottom: 1px solid #e9ecef; transition: background 0.2s;" onmouseover="this.style.background='#f8f9fa'" onmouseout="this.style.background='white'">
+                                <td style="padding: 1rem 1.5rem; font-weight: 600; color: #495057;">${a.displayOrder}</td>
+                                <td style="padding: 1rem 1.5rem; font-weight: 600; color: #212529;">${a.title}</td>
+                                <td style="padding: 1rem 1.5rem; color: #6c757d; max-width: 300px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${a.content}</td>
+                                <td style="padding: 1rem 1.5rem; text-align: center;">
+                                    <span style="padding: 0.4rem 0.9rem; border-radius: 20px; font-weight: 600; font-size: 0.85rem; background: ${a.isActive ? '#28a745' : '#6c757d'}; color: white;">
+                                        ${a.isActive ? '활성' : '비활성'}
+                                    </span>
+                                </td>
+                                <td style="padding: 1rem 1.5rem; text-align: center;">
+                                    <button onclick="editAnnouncement(${a.id})" style="padding: 0.5rem 1rem; background: #007bff; color: white; border: none; border-radius: 6px; cursor: pointer; margin-right: 0.5rem; font-weight: 500; transition: all 0.2s;" onmouseover="this.style.background='#0056b3'" onmouseout="this.style.background='#007bff'">
+                                        <i class="fas fa-edit"></i> 수정
+                                    </button>
+                                    <button onclick="deleteAnnouncement(${a.id})" style="padding: 0.5rem 1rem; background: #dc3545; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 500; transition: all 0.2s;" onmouseover="this.style.background='#c82333'" onmouseout="this.style.background='#dc3545'">
+                                        <i class="fas fa-trash-alt"></i> 삭제
+                                    </button>
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+        }
+        
+        // 공지사항 추가 모달 표시
+        function showAddAnnouncementModal() {
+            document.getElementById('announcementModalTitle').innerHTML = '<i class="fas fa-plus-circle"></i> 공지사항 추가';
+            document.getElementById('announcementId').value = '';
+            document.getElementById('announcementTitle').value = '';
+            document.getElementById('announcementContent').value = '';
+            document.getElementById('announcementOrder').value = '0';
+            document.getElementById('announcementActive').checked = true;
+            
+            document.getElementById('announcementModal').style.display = 'flex';
+        }
+        
+        // 공지사항 수정 모달 표시
+        function editAnnouncement(id) {
+            fetch(`${API_BASE_URL}/announcements/${id}`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('공지사항 로드 실패');
+                    }
+                    return response.json();
+                })
+                .then(announcement => {
+                    document.getElementById('announcementModalTitle').innerHTML = '<i class="fas fa-edit"></i> 공지사항 수정';
+                    document.getElementById('announcementId').value = announcement.id;
+                    document.getElementById('announcementTitle').value = announcement.title;
+                    document.getElementById('announcementContent').value = announcement.content;
+                    document.getElementById('announcementOrder').value = announcement.displayOrder;
+                    document.getElementById('announcementActive').checked = announcement.isActive;
+                    
+                    document.getElementById('announcementModal').style.display = 'flex';
+                })
+                .catch(error => {
+                    console.error('공지사항 로드 실패:', error);
+                    alert('공지사항을 불러올 수 없습니다.');
+                });
+        }
+        
+        // 공지사항 모달 닫기
+        function closeAnnouncementModal() {
+            document.getElementById('announcementModal').style.display = 'none';
+        }
+        
+        // 공지사항 저장
+        function saveAnnouncement(event) {
+            event.preventDefault();
+            
+            const id = document.getElementById('announcementId').value;
+            const data = {
+                title: document.getElementById('announcementTitle').value,
+                content: document.getElementById('announcementContent').value,
+                displayOrder: parseInt(document.getElementById('announcementOrder').value),
+                isActive: document.getElementById('announcementActive').checked
+            };
+            
+            const url = id ? `${API_BASE_URL}/announcements/${id}` : `${API_BASE_URL}/announcements`;
+            const method = id ? 'PUT' : 'POST';
+            
+            fetch(url, {
+                method: method,
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(data)
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('공지사항 저장 실패');
+                }
+                return response.json();
+            })
+            .then(result => {
+                alert(id ? '공지사항이 수정되었습니다.' : '공지사항이 추가되었습니다.');
+                closeAnnouncementModal();
+                loadAnnouncements();
+            })
+            .catch(error => {
+                console.error('공지사항 저장 실패:', error);
+                alert('공지사항 저장에 실패했습니다.');
+            });
+        }
+        
+        // 공지사항 삭제
+        function deleteAnnouncement(id) {
+            if (!confirm('정말로 이 공지사항을 삭제하시겠습니까?')) {
+                return;
+            }
+            
+            fetch(`${API_BASE_URL}/announcements/${id}`, {
+                method: 'DELETE'
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('공지사항 삭제 실패');
+                }
+                alert('공지사항이 삭제되었습니다.');
+                loadAnnouncements();
+            })
+            .catch(error => {
+                console.error('공지사항 삭제 실패:', error);
+                alert('공지사항 삭제에 실패했습니다.');
+            });
+        }
+    </script>
+
+    <!-- 마이페이지 모달 -->
+    <div id="profileModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center;">
+        <div style="background: white; padding: 2rem; border-radius: 10px; max-width: 600px; width: 90%; max-height: 90vh; overflow-y: auto;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                <h3 style="margin: 0;"><i class="fas fa-user"></i> 내 정보</h3>
+                <button onclick="closeProfileModal()" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #666;">&times;</button>
+            </div>
+            
+            <div style="background: #f8f9fa; padding: 1.5rem; border-radius: 8px;">
+                <form id="profileForm">
+                    <div style="margin-bottom: 1.5rem;">
+                        <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">아이디</label>
+                        <input type="text" id="profileUsername" readonly 
+                               style="width: 100%; padding: 0.75rem; border: 1px solid #ddd; border-radius: 4px; background: #e9ecef;">
+                    </div>
+                    
+                    <div style="margin-bottom: 1.5rem;">
+                        <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">이름 <span style="color: red;">*</span></label>
+                        <input type="text" id="profileName" 
+                               style="width: 100%; padding: 0.75rem; border: 1px solid #ddd; border-radius: 4px;">
+                    </div>
+                    
+                    <div style="margin-bottom: 1.5rem;">
+                        <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">전화번호</label>
+                        <input type="text" id="profilePhone" placeholder="010-1234-5678"
+                               style="width: 100%; padding: 0.75rem; border: 1px solid #ddd; border-radius: 4px;">
+                    </div>
+                    
+                    <div id="licenseGroup" style="margin-bottom: 1.5rem; display: none;">
+                        <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">의사 면허번호</label>
+                        <input type="text" id="profileLicense" readonly
+                               style="width: 100%; padding: 0.75rem; border: 1px solid #ddd; border-radius: 4px; background: #e9ecef;">
+                    </div>
+                    
+                    <div style="margin-bottom: 1.5rem;">
+                        <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">역할</label>
+                        <input type="text" id="profileRole" readonly 
+                               style="width: 100%; padding: 0.75rem; border: 1px solid #ddd; border-radius: 4px; background: #e9ecef;">
+                    </div>
+                    
+                    <hr style="margin: 2rem 0; border: none; border-top: 2px solid #dee2e6;">
+                    
+                    <h4 style="color: #333; margin-bottom: 1rem;">비밀번호 변경</h4>
+                    <p style="color: #666; font-size: 0.9rem; margin-bottom: 1rem;">비밀번호를 변경하지 않으려면 아래 필드를 비워두세요.</p>
+                    
+                    <div style="margin-bottom: 1.5rem;">
+                        <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">현재 비밀번호</label>
+                        <input type="password" id="currentPassword" 
+                               style="width: 100%; padding: 0.75rem; border: 1px solid #ddd; border-radius: 4px;">
+                    </div>
+                    
+                    <div style="margin-bottom: 1.5rem;">
+                        <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">새 비밀번호</label>
+                        <input type="password" id="newPassword" 
+                               style="width: 100%; padding: 0.75rem; border: 1px solid #ddd; border-radius: 4px;">
+                    </div>
+                    
+                    <div style="margin-bottom: 1.5rem;">
+                        <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">새 비밀번호 확인</label>
+                        <input type="password" id="newPasswordConfirm" 
+                               style="width: 100%; padding: 0.75rem; border: 1px solid #ddd; border-radius: 4px;">
+                    </div>
+                    
+                    <div style="display: flex; gap: 1rem; margin-top: 2rem; justify-content: flex-end;">
+                        <button type="button" onclick="closeProfileModal()" style="padding: 0.7rem 1.2rem; border: 2px solid #6c757d; background: white; color: #333; border-radius: 8px; cursor: pointer; font-weight: 600;">
+                            취소
+                        </button>
+                        <button type="button" onclick="updateProfile()" style="padding: 0.7rem 1.2rem; border: 2px solid #333; background: white; color: #333; border-radius: 8px; cursor: pointer; font-weight: 600;">
+                            <i class="fas fa-save"></i> 정보 저장
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 공지사항 추가/수정 모달 -->
+    <div id="announcementModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1001; justify-content: center; align-items: center;">
+        <div style="background: white; border-radius: 15px; max-width: 600px; width: 90%; max-height: 90vh; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.2);">
+            
+            <!-- 모달 헤더 -->
+            <div style="background: #f8f9fa; padding: 1.5rem 2rem; border-bottom: 2px solid #e9ecef;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <h3 style="margin: 0; font-size: 1.5rem; font-weight: 600; color: #212529;" id="announcementModalTitle">
+                        <i class="fas fa-plus-circle"></i> 공지사항 추가
+                    </h3>
+                    <button onclick="closeAnnouncementModal()" style="background: none; border: none; cursor: pointer; color: #6c757d; font-size: 1.5rem; transition: color 0.2s;" onmouseover="this.style.color='#212529'" onmouseout="this.style.color='#6c757d'">
+                        &times;
+                    </button>
+                </div>
+            </div>
+            
+            <!-- 모달 바디 -->
+            <div style="padding: 2rem; max-height: calc(90vh - 200px); overflow-y: auto;">
+                <form id="announcementForm" onsubmit="saveAnnouncement(event)">
+                    <input type="hidden" id="announcementId">
+                    
+                    <div style="margin-bottom: 1.5rem;">
+                        <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: #495057;">
+                            제목 <span style="color: #dc3545;">*</span>
+                        </label>
+                        <input type="text" id="announcementTitle" required
+                               placeholder="공지사항 제목을 입력하세요"
+                               style="width: 100%; padding: 0.75rem; border: 1px solid #ced4da; border-radius: 6px; font-size: 1rem; transition: border-color 0.2s;" onfocus="this.style.borderColor='#80bdff'" onblur="this.style.borderColor='#ced4da'">
+                    </div>
+                    
+                    <div style="margin-bottom: 1.5rem;">
+                        <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: #495057;">
+                            내용 <span style="color: #dc3545;">*</span>
+                        </label>
+                        <textarea id="announcementContent" rows="5" required
+                                  placeholder="공지사항 내용을 입력하세요"
+                                  style="width: 100%; padding: 0.75rem; border: 1px solid #ced4da; border-radius: 6px; font-size: 1rem; resize: vertical; font-family: inherit; transition: border-color 0.2s;" onfocus="this.style.borderColor='#80bdff'" onblur="this.style.borderColor='#ced4da'"></textarea>
+                    </div>
+                    
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem;">
+                        <div>
+                            <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: #495057;">
+                                표시 순서
+                            </label>
+                            <input type="number" id="announcementOrder" value="0" min="0"
+                                   style="width: 100%; padding: 0.75rem; border: 1px solid #ced4da; border-radius: 6px; font-size: 1rem; transition: border-color 0.2s;" onfocus="this.style.borderColor='#80bdff'" onblur="this.style.borderColor='#ced4da'">
+                            <small style="color: #6c757d; font-size: 0.85rem; margin-top: 0.25rem; display: block;">
+                                낮을수록 먼저 표시
+                            </small>
+                        </div>
+                        
+                        <div>
+                            <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: #495057;">
+                                상태
+                            </label>
+                            <label style="display: flex; align-items: center; padding: 0.75rem; background: #f8f9fa; border: 1px solid #ced4da; border-radius: 6px; cursor: pointer;">
+                                <input type="checkbox" id="announcementActive" checked style="width: 20px; height: 20px; margin-right: 0.5rem; cursor: pointer;">
+                                <span style="font-weight: 500; color: #495057;">활성화</span>
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div style="display: flex; gap: 0.75rem; margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid #e9ecef;">
+                        <button type="button" onclick="closeAnnouncementModal()" style="flex: 1; padding: 0.75rem 1.5rem; border: 1px solid #ced4da; background: white; color: #6c757d; border-radius: 6px; cursor: pointer; font-weight: 500; font-size: 1rem; transition: all 0.2s;" onmouseover="this.style.background='#e9ecef'; this.style.color='#495057'" onmouseout="this.style.background='white'; this.style.color='#6c757d'">
+                            <i class="fas fa-times"></i> 취소
+                        </button>
+                        <button type="submit" style="flex: 1; padding: 0.75rem 1.5rem; border: none; background: #007bff; color: white; border-radius: 6px; cursor: pointer; font-weight: 500; font-size: 1rem; transition: all 0.2s;" onmouseover="this.style.background='#0056b3'" onmouseout="this.style.background='#007bff'">
+                            <i class="fas fa-save"></i> 저장
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
